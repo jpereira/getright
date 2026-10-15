@@ -9,6 +9,10 @@
 #include "completion_popup.h"
 
 #include <QJsonArray>
+#include <QDialog>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QJsonDocument>
 #include <QStandardItemModel>
 #include <QTableView>
@@ -125,6 +129,32 @@ private slots:
         QTRY_COMPARE(window.model_->rowCount(), 1);
         QCOMPARE(window.model_->item(0, 0)->text(), QString("file2"));
         QVERIFY(!window.activeJob_);
+    }
+
+    void progressWindowControlsOnlyItsTransfer()
+    {
+        MainWindow window;
+        window.showTransferDetails(1);
+        QVERIFY(window.transferDialog_);
+        QCOMPARE(window.transferPath_->text(), directory_->filePath("file1"));
+        QCOMPARE(window.transferPause_->text(), QString("Resume"));
+        window.transferPause_->click();
+        QTRY_COMPARE(state(window, 1), QString("Complete"));
+        QCOMPARE(state(window, 0), QString("Paused"));
+        QCOMPARE(state(window, 2), QString("Paused"));
+        QVERIFY(!window.transferPause_->isEnabled());
+    }
+
+    void corruptDataExplainsRecovery()
+    {
+        QFile history(directory_->filePath("history.json"));
+        QVERIFY(history.open(QIODevice::WriteOnly));
+        history.write("{broken");
+        history.close();
+        MainWindow window;
+        QVERIFY(!window.historyWritable_);
+        QVERIFY(!window.storageWarning_->isHidden());
+        QVERIFY(window.storageWarning_->text().contains(".broken"));
     }
 
     void localFailureAdvancesQueue()

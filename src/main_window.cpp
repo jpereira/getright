@@ -7,6 +7,7 @@
 #include "main_window.h"
 #include "transfer_job.h"
 #include "completion_popup.h"
+#include "ui_icons.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -55,6 +56,7 @@
 #include <QToolBar>
 #include <QTimer>
 #include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 #include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -65,100 +67,9 @@ void activateMacApplication();
 
 namespace {
 
-class ProgressDelegate final : public QStyledItemDelegate
-{
-public:
-    using QStyledItemDelegate::QStyledItemDelegate;
-
-    void paint(QPainter *painter, const QStyleOptionViewItem &option,
-               const QModelIndex &index) const override
-    {
-        QStyleOptionProgressBar bar;
-        bar.rect = option.rect.adjusted(5, 5, -5, -5);
-        bar.palette = option.palette;
-        bar.state = option.state;
-        bar.minimum = 0;
-        const QModelIndex name = index.sibling(index.row(), 0);
-        const qint64 received = name.data(Qt::UserRole + 4).toLongLong();
-        const qint64 total = name.data(Qt::UserRole + 5).toLongLong();
-        bar.maximum = total >= 0 ? 100 : 0;
-        bar.progress = total > 0
-            ? qBound(0, int(100.0 * received / total), 100) : 0;
-        bar.text = total > 0 ? QStringLiteral("%1%").arg(bar.progress)
-            : QLocale().formattedDataSize(received);
-        bar.textVisible = true;
-        bar.textAlignment = Qt::AlignCenter;
-        const QStyle *style = option.widget ? option.widget->style() : QApplication::style();
-        style->drawControl(QStyle::CE_ProgressBar, &bar, painter, option.widget);
-    }
-};
-
 QIcon standardIcon(QWidget *widget, QStyle::StandardPixmap pixmap)
 {
     return widget->style()->standardIcon(pixmap);
-}
-
-QIcon coloredIcon(const QString &kind)
-{
-    QPixmap pixmap(32, 32);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(QColor("#555555"), 1.2));
-
-    if (kind == "start") {
-        painter.setBrush(QColor("#39a84a"));
-        QPolygon triangle{{9, 5}, {25, 16}, {9, 27}};
-        painter.drawPolygon(triangle);
-    } else if (kind == "stop") {
-        painter.setBrush(QColor("#d94136"));
-        painter.drawRoundedRect(QRect(7, 7, 18, 18), 2, 2);
-    } else if (kind == "pause") {
-        painter.setBrush(QColor("#377ac5"));
-        painter.drawRect(QRect(8, 6, 6, 20));
-        painter.drawRect(QRect(19, 6, 6, 20));
-    } else if (kind == "remove") {
-        painter.setPen(QPen(QColor("#c7362d"), 4, Qt::SolidLine,
-                            Qt::RoundCap));
-        painter.drawLine(QPoint(9, 9), QPoint(23, 23));
-        painter.drawLine(QPoint(23, 9), QPoint(9, 23));
-    } else if (kind == "add") {
-        painter.setPen(QPen(QColor("#376fae"), 2));
-        painter.setBrush(QColor("#eaf2fb"));
-        painter.drawRoundedRect(QRect(6, 5, 20, 22), 2, 2);
-        painter.setPen(QPen(QColor("#32964b"), 3, Qt::SolidLine,
-                            Qt::RoundCap));
-        painter.drawLine(QPoint(16, 10), QPoint(16, 21));
-        painter.drawLine(QPoint(11, 16), QPoint(21, 16));
-    } else if (kind == "upload") {
-        painter.setPen(QPen(QColor("#376fae"), 2));
-        painter.setBrush(QColor("#eaf2fb"));
-        painter.drawRoundedRect(QRect(6, 6, 20, 20), 2, 2);
-        painter.setPen(QPen(QColor("#d58b20"), 3, Qt::SolidLine,
-                            Qt::RoundCap));
-        painter.drawLine(QPoint(16, 22), QPoint(16, 11));
-        painter.drawLine(QPoint(11, 16), QPoint(16, 11));
-        painter.drawLine(QPoint(21, 16), QPoint(16, 11));
-    } else if (kind == "help") {
-        painter.setBrush(QColor("#397bc0"));
-        painter.drawEllipse(QRect(5, 5, 22, 22));
-        painter.setPen(QPen(Qt::white, 2));
-        painter.setFont(QFont("Arial", 16, QFont::Bold));
-        painter.drawText(QRect(5, 5, 22, 22), Qt::AlignCenter, "?");
-    } else {
-        painter.setBrush(QColor("#2679bb"));
-        painter.drawEllipse(QRect(3, 3, 26, 26));
-        painter.setPen(QPen(Qt::white, 1.4));
-        painter.drawEllipse(QRect(10, 3, 12, 26));
-        painter.drawLine(QPoint(4, 12), QPoint(28, 12));
-        painter.drawLine(QPoint(4, 20), QPoint(28, 20));
-        painter.setPen(QPen(QColor("#ffd044"), 3, Qt::SolidLine,
-                            Qt::RoundCap));
-        painter.drawLine(QPoint(16, 8), QPoint(16, 23));
-        painter.drawLine(QPoint(11, 18), QPoint(16, 23));
-        painter.drawLine(QPoint(21, 18), QPoint(16, 23));
-    }
-    return QIcon(pixmap);
 }
 
 void setDetailText(QLineEdit *field, const QString &text)
@@ -279,7 +190,7 @@ MainWindow::MainWindow(QWidget *parent)
       filter_(new QLineEdit(this)),
       folders_(new QTreeWidget(this)),
       downloads_(new QTableView(this)),
-      model_(new QStandardItemModel(0, 7, this)),
+      model_(new QStandardItemModel(0, 8, this)),
       summary_(new QLabel(this)),
       storageWarning_(new QLabel(this)),
       urlStatus_(new QLabel(this)),
@@ -344,24 +255,24 @@ MainWindow::MainWindow(QWidget *parent)
         trayIcon_->show();
         QApplication::setQuitOnLastWindowClosed(false);
     }
-    resize(1020, 620);
+    resize(980, 600);
     restoreGeometry(QByteArray::fromBase64(
         settings_.value("windowGeometry").toString().toLatin1()));
 
     model_->setHorizontalHeaderLabels(
-        {tr("File"), tr("Size"), tr("Status"), tr("Progress"),
-         tr("Speed"), tr("Time left"), tr("Address")});
+        {tr("Local File"), tr("Size"), tr("Status"), tr("Progress"),
+         tr("Speed"), tr("Est. Time"), tr("Address"), tr("Order")});
     downloads_->setModel(model_);
     downloads_->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(downloads_, &QWidget::customContextMenuRequested,
             this, &MainWindow::showTransferMenu);
-    downloads_->setItemDelegateForColumn(ProgressColumn,
-                                         new ProgressDelegate(downloads_));
     downloads_->setSelectionBehavior(QAbstractItemView::SelectRows);
     downloads_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     downloads_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    downloads_->setAlternatingRowColors(true);
+    downloads_->setAlternatingRowColors(false);
+    downloads_->setShowGrid(false);
     downloads_->verticalHeader()->hide();
+    downloads_->verticalHeader()->setDefaultSectionSize(23);
     downloads_->horizontalHeader()->setStretchLastSection(false);
     downloads_->horizontalHeader()->setSectionResizeMode(
         NameColumn, QHeaderView::Stretch);
@@ -373,6 +284,13 @@ MainWindow::MainWindow(QWidget *parent)
     downloads_->setColumnWidth(SpeedColumn, 95);
     downloads_->setColumnWidth(RemainingColumn, 95);
     downloads_->setColumnHidden(UrlColumn, true);
+    downloads_->setColumnWidth(OrderColumn, 48);
+    auto *header = downloads_->horizontalHeader();
+    header->moveSection(header->visualIndex(OrderColumn), 0);
+    header->moveSection(header->visualIndex(ProgressColumn), 2);
+    header->moveSection(header->visualIndex(SizeColumn), 3);
+    header->moveSection(header->visualIndex(RemainingColumn), 4);
+    header->moveSection(header->visualIndex(SpeedColumn), 5);
     downloads_->setSortingEnabled(false);
 
     folders_->setHeaderHidden(true);
@@ -390,11 +308,11 @@ MainWindow::MainWindow(QWidget *parent)
     addFilter(downloadsRoot, tr("Active"), "downloads_active");
     addFilter(downloadsRoot, tr("Stopped / Queued"), "downloads_stopped");
     addFilter(downloadsRoot, tr("Completed"), "downloads_complete");
-    auto *foldersRoot = addFilter(nullptr, tr("Folders"), "folders");
+    auto *foldersRoot = addFilter(downloadsRoot, tr("Folders"), "folders");
     foldersRoot->setIcon(0, standardIcon(this, QStyle::SP_DirIcon));
     addFilter(foldersRoot, tr("Downloads"), "folder_downloads");
     addFilter(foldersRoot, tr("Unfiled"), "folder_unfiled");
-    auto *filtersRoot = addFilter(nullptr, tr("Filters"), "filters");
+    auto *filtersRoot = addFilter(downloadsRoot, tr("Filters"), "filters");
     filtersRoot->setIcon(0, standardIcon(this, QStyle::SP_FileDialogContentsView));
     addFilter(filtersRoot, tr("Applications"), "type_applications");
     addFilter(filtersRoot, tr("Archives"), "type_archives");
@@ -411,6 +329,7 @@ MainWindow::MainWindow(QWidget *parent)
     addFilter(historyRoot, tr("Yesterday"), "history_yesterday");
     addFilter(historyRoot, tr("Past week"), "history_week");
     addFilter(historyRoot, tr("Past month"), "history_month");
+    folders_->insertTopLevelItem(1, folders_->takeTopLevelItem(2));
     folders_->expandAll();
     folders_->setCurrentItem(downloadsRoot->child(0));
 
@@ -419,15 +338,15 @@ MainWindow::MainWindow(QWidget *parent)
     auto *sidebar = new QWidget(this);
     auto *sideLayout = new QVBoxLayout(sidebar);
     sideLayout->setContentsMargins(0, 0, 0, 0);
-    sideLayout->addWidget(new QLabel(tr("Downloads"), sidebar));
     sideLayout->addWidget(folders_, 1);
 
     auto *content = new QWidget(this);
     auto *contentLayout = new QVBoxLayout(content);
-    contentLayout->setContentsMargins(8, 8, 8, 8);
+    contentLayout->setContentsMargins(3, 0, 0, 0);
+    contentLayout->setSpacing(4);
     storageWarning_->setWordWrap(true);
     storageWarning_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    storageWarning_->hide();
+    storageWarning_->setVisible(!storageWarning_->text().isEmpty());
     contentLayout->addWidget(storageWarning_);
     contentLayout->addWidget(filter_);
     contentLayout->addWidget(downloads_, 1);
@@ -469,40 +388,43 @@ MainWindow::MainWindow(QWidget *parent)
     statsLayout->addStretch(1);
     detailLayout->addRow(stats);
     contentLayout->addWidget(details);
+    details->setVisible(settings_.value("showDetailsPanel").toBool(false));
     auto *splitter = new QSplitter(this);
     splitter->addWidget(sidebar);
     splitter->addWidget(content);
     splitter->setStretchFactor(1, 1);
+    splitter->setSizes({190, 790});
     setCentralWidget(splitter);
 
     auto *toolbar = addToolBar(tr("Downloads"));
     toolbar->setMovable(false);
-    toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    toolbar->setIconSize(QSize(20, 20));
+    toolbar->setToolButtonStyle(settings_.value("showToolbarLabels").toBool(false)
+        ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+    toolbar->setIconSize(QSize(24, 24));
     QAction *add = toolbar->addAction(
-        coloredIcon("add"), tr("Add"),
+        transferIcon("add"), tr("Add"),
         this, &MainWindow::addDownload);
     add->setShortcut(QKeySequence::New);
     QAction *upload = toolbar->addAction(
-        coloredIcon("upload"), tr("Upload"), this, &MainWindow::addUpload);
+        transferIcon("upload"), tr("Upload"), this, &MainWindow::addUpload);
     toolbar->addSeparator();
     QAction *start = toolbar->addAction(
-        coloredIcon("start"), tr("Start"),
+        transferIcon("start"), tr("Start"),
         this, &MainWindow::startSelected);
     start->setShortcut(Qt::Key_F5);
     QAction *pause = toolbar->addAction(
-        coloredIcon("pause"), tr("Pause"),
+        transferIcon("pause"), tr("Pause"),
         this, &MainWindow::pauseSelected);
     QAction *stop = toolbar->addAction(
-        coloredIcon("stop"), tr("Stop"),
+        transferIcon("stop"), tr("Stop"),
         this, &MainWindow::stopSelected);
     stop->setShortcut(Qt::Key_Escape);
     QAction *remove = toolbar->addAction(
-        coloredIcon("remove"), tr("Remove"),
+        transferIcon("remove"), tr("Remove"),
         this, &MainWindow::removeSelected);
     remove->setShortcut(QKeySequence::Delete);
     toolbar->addSeparator();
-    toolbar->addAction(coloredIcon("help"),
+    toolbar->addAction(transferIcon("help"),
                        tr("Help"), this, &MainWindow::showHelp);
     toolbar->addAction(windowIcon(), tr("About"), this, &MainWindow::showAbout);
 
@@ -518,7 +440,33 @@ MainWindow::MainWindow(QWidget *parent)
     downloadsMenu->addAction(pause);
     downloadsMenu->addAction(stop);
     downloadsMenu->addAction(remove);
+    auto *editMenu = menuBar()->addMenu(tr("&Edit"));
+    editMenu->addAction(tr("Copy URL"), QKeySequence::Copy, this, [this]() {
+        QStringList urls;
+        for (const auto &index : downloads_->selectionModel()->selectedRows())
+            urls.append(model_->item(index.row(), NameColumn)->data(UrlRole).toString());
+        QApplication::clipboard()->setText(urls.join('\n'));
+    });
+    editMenu->addAction(tr("Select All"), QKeySequence::SelectAll,
+                        downloads_, &QTableView::selectAll);
     auto *viewMenu = menuBar()->addMenu(tr("&View"));
+    auto *showDetails = viewMenu->addAction(tr("Show transfer details"));
+    showDetails->setCheckable(true);
+    showDetails->setChecked(settings_.value("showDetailsPanel").toBool(false));
+    connect(showDetails, &QAction::toggled, this, [this, details](bool checked) {
+        details->setVisible(checked);
+        settings_.insert("showDetailsPanel", checked);
+        saveSettings();
+    });
+    auto *showLabels = viewMenu->addAction(tr("Show toolbar labels"));
+    showLabels->setCheckable(true);
+    showLabels->setChecked(settings_.value("showToolbarLabels").toBool(false));
+    connect(showLabels, &QAction::toggled, this, [this, toolbar](bool checked) {
+        toolbar->setToolButtonStyle(checked ? Qt::ToolButtonTextBesideIcon
+                                           : Qt::ToolButtonIconOnly);
+        settings_.insert("showToolbarLabels", checked);
+        saveSettings();
+    });
     viewMenu->addAction(tr("Show toolbar"), toolbar, &QToolBar::show);
     viewMenu->addAction(tr("Hide toolbar"), toolbar, &QToolBar::hide);
     auto *themeMenu = viewMenu->addMenu(tr("Theme"));
@@ -575,9 +523,10 @@ MainWindow::MainWindow(QWidget *parent)
             ? model_->item(selectedRow(), UrlColumn)->text() : QString());
         updateDetails();
     });
-    connect(downloads_, &QTableView::doubleClicked, this,
+    connect(downloads_, &QTableView::clicked, this,
             [this](const QModelIndex &index) {
-        if (index.isValid())
+        if (index.isValid() && downloads_->selectionModel()->selectedRows().size() == 1 &&
+                QApplication::keyboardModifiers() == Qt::NoModifier)
             showTransferDetails(index.row());
     });
     connect(detailsTimer_, &QTimer::timeout, this, &MainWindow::updateDetails);
@@ -713,7 +662,7 @@ void MainWindow::updateDetails()
     const qint64 elapsed = item->data(ElapsedRole).toLongLong() +
         (started.isValid() ? started.secsTo(QDateTime::currentDateTime()) : 0);
     const int percent = total > 0
-                            ? qBound(0, int(received * 100 / total), 100)
+                            ? qBound(0, int(100.0 * received / total), 100)
                             : 0;
     detailName_->setText(item->text());
     setDetailText(detailError_, item->data(ErrorRole).toString());
@@ -735,157 +684,18 @@ void MainWindow::updateDetails()
     detailProgress_->setValue(percent);
 }
 
-void MainWindow::showTransferDetails(int row)
+QTreeWidgetItem *MainWindow::filterItem(const QString &key) const
 {
-    if (row < 0 || row >= model_->rowCount())
-        return;
-    transferDialogIndex_ = model_->index(row, NameColumn);
-    if (!transferDialog_) {
-        auto *dialog = new QDialog(this, Qt::Window);
-        dialog->setAttribute(Qt::WA_DeleteOnClose);
-        transferDialog_ = dialog;
-        dialog->setWindowIcon(windowIcon());
-
-        auto *layout = new QVBoxLayout(dialog);
-        auto *form = new QFormLayout;
-        form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-        transferName_ = new QLabel(dialog);
-        transferUrl_ = new QLineEdit(dialog);
-        transferPath_ = new QLineEdit(dialog);
-        transferAmount_ = new QLabel(dialog);
-        transferError_ = new QLineEdit(dialog);
-        transferSpeed_ = new QLabel(dialog);
-        transferElapsed_ = new QLabel(dialog);
-        transferRemaining_ = new QLabel(dialog);
-        for (QLineEdit *field : {transferUrl_, transferPath_, transferError_}) {
-            field->setReadOnly(true);
-            field->setMinimumWidth(0);
-        }
-        transferName_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        form->addRow(tr("File:"), transferName_);
-        form->addRow(tr("Address:"), transferUrl_);
-        form->addRow(tr("Save to:"), transferPath_);
-        form->addRow(tr("Transferred:"), transferAmount_);
-        form->addRow(tr("Error:"), transferError_);
-        layout->addLayout(form);
-
-        auto *progressLine = new QWidget(dialog);
-        auto *progressLayout = new QHBoxLayout(progressLine);
-        progressLayout->setContentsMargins(0, 0, 0, 0);
-        transferProgress_ = new QProgressBar(progressLine);
-        transferProgress_->setRange(0, 100);
-        transferPercent_ = new QLabel(progressLine);
-        progressLayout->addWidget(transferProgress_, 1);
-        progressLayout->addWidget(transferPercent_);
-        layout->addWidget(progressLine);
-
-        auto *stats = new QWidget(dialog);
-        auto *statsLayout = new QHBoxLayout(stats);
-        statsLayout->setContentsMargins(0, 0, 0, 0);
-        statsLayout->addWidget(new QLabel(tr("Speed:"), stats));
-        statsLayout->addWidget(transferSpeed_);
-        statsLayout->addSpacing(16);
-        statsLayout->addWidget(new QLabel(tr("Elapsed:"), stats));
-        statsLayout->addWidget(transferElapsed_);
-        statsLayout->addSpacing(16);
-        statsLayout->addWidget(new QLabel(tr("Remaining:"), stats));
-        statsLayout->addWidget(transferRemaining_);
-        statsLayout->addStretch(1);
-        layout->addWidget(stats);
-
-        auto *buttons = new QWidget(dialog);
-        auto *buttonLayout = new QHBoxLayout(buttons);
-        buttonLayout->setContentsMargins(0, 8, 0, 0);
-        buttonLayout->addStretch(1);
-        transferPause_ = new QPushButton(tr("Pause"), buttons);
-        auto *close = new QPushButton(tr("Close"), buttons);
-        buttonLayout->addWidget(transferPause_);
-        buttonLayout->addWidget(close);
-        layout->addWidget(buttons);
-        connect(close, &QPushButton::clicked, dialog, &QDialog::close);
-        connect(transferPause_, &QPushButton::clicked, this, [this]() {
-            const int selected = transferDialogIndex_.row();
-            if (selected < 0 || selected >= model_->rowCount())
-                return;
-            downloads_->selectRow(selected);
-            const QString state = model_->item(selected, NameColumn)
-                                      ->data(StateRole).toString();
-            if (state == "Downloading" || state == "Connecting")
-                pauseSelected();
-            else if (state != "Complete")
-                startSelected();
-        });
-        connect(dialog, &QObject::destroyed, this, [this]() {
-            transferDialogIndex_ = QPersistentModelIndex();
-            transferName_ = nullptr;
-            transferUrl_ = nullptr;
-            transferPath_ = nullptr;
-            transferAmount_ = nullptr;
-            transferError_ = nullptr;
-            transferSpeed_ = nullptr;
-            transferElapsed_ = nullptr;
-            transferRemaining_ = nullptr;
-            transferPercent_ = nullptr;
-            transferProgress_ = nullptr;
-            transferPause_ = nullptr;
-        });
+    for (QTreeWidgetItemIterator it(folders_); *it; ++it) {
+        if ((*it)->data(0, Qt::UserRole).toString() == key)
+            return *it;
     }
-    updateTransferDialog();
-    transferDialog_->show();
-    transferDialog_->raise();
-    transferDialog_->activateWindow();
-}
-
-void MainWindow::updateTransferDialog()
-{
-    if (!transferDialog_)
-        return;
-    const int row = transferDialogIndex_.row();
-    if (row < 0 || row >= model_->rowCount()) {
-        transferDialog_->close();
-        return;
-    }
-
-    const auto *item = model_->item(row, NameColumn);
-    const qint64 received = item->data(ReceivedRole).toLongLong();
-    const qint64 total = item->data(TotalRole).toLongLong();
-    const qint64 speed = item->data(SpeedRole).toLongLong();
-    const QString state = item->data(StateRole).toString();
-    const QDateTime started = item->data(StartedRole).toDateTime();
-    const qint64 elapsed = item->data(ElapsedRole).toLongLong() +
-        (started.isValid() ? started.secsTo(QDateTime::currentDateTime()) : 0);
-    const int percent = total > 0
-        ? qBound(0, int(received * 100 / total), 100) : 0;
-    transferDialog_->setWindowTitle(tr("Transfer Progress — %1")
-                                        .arg(item->text()));
-    transferName_->setText(item->text());
-    setDetailText(transferError_, item->data(ErrorRole).toString());
-    setDetailText(transferUrl_, item->data(UrlRole).toString());
-    setDetailText(transferPath_, item->data(PathRole).toString());
-    transferAmount_->setText(total > 0
-        ? QStringLiteral("%1 of %2")
-              .arg(QLocale().formattedDataSize(received),
-                   QLocale().formattedDataSize(total))
-        : QLocale().formattedDataSize(received));
-    transferProgress_->setValue(percent);
-    transferPercent_->setText(total > 0
-        ? QStringLiteral("%1% — %2").arg(percent).arg(
-            model_->item(row, StatusColumn)->text()) : model_->item(row, StatusColumn)->text());
-    transferSpeed_->setText(QLocale().formattedDataSize(speed) + tr("/s"));
-    transferElapsed_->setText(
-        QTime(0, 0).addSecs(int(elapsed)).toString("hh:mm:ss"));
-    transferRemaining_->setText(total > 0 && speed > 0
-        ? QTime(0, 0).addSecs(int((total - received) / speed))
-              .toString("hh:mm:ss")
-        : tr("—"));
-    const bool active = state == "Downloading" || state == "Connecting";
-    transferPause_->setText(active ? tr("Pause") : tr("Resume"));
-    transferPause_->setEnabled(state != "Complete");
+    return nullptr;
 }
 
 void MainWindow::ensureFolderFilter(const QString &folder)
 {
-    auto *root = folders_->topLevelItem(1);
+    auto *root = filterItem("folders");
     for (int index = 0; index < root->childCount(); ++index) {
         if (root->child(index)->text(0) == folder)
             return;
@@ -932,7 +742,7 @@ void MainWindow::addDownload()
 
     QList<QStandardItem *> items;
     auto *fileItem = new QStandardItem(
-        standardIcon(this, QStyle::SP_FileIcon), name);
+        transferIcon("address"), QFileInfo(path).fileName());
     fileItem->setData(address.toString(), UrlRole);
     fileItem->setData(QUuid::createUuid().toString(QUuid::WithoutBraces),
                       IdRole);
@@ -945,14 +755,14 @@ void MainWindow::addDownload()
     ensureFolderFilter(folder);
     fileItem->setData(QDateTime::currentDateTime(), AddedRole);
     fileItem->setData(qint64(0), ReceivedRole);
-    fileItem->setData(qint64(0), TotalRole);
+    fileItem->setData(qint64(-1), TotalRole);
     items << fileItem << new QStandardItem(tr("Unknown"))
           << new QStandardItem(tr("Queued")) << new QStandardItem()
           << new QStandardItem(tr("—")) << new QStandardItem(tr("—"))
           << new QStandardItem(address.toString());
     model_->appendRow(items);
     markTransfersDirty();
-    folders_->setCurrentItem(folders_->topLevelItem(0));
+    folders_->setCurrentItem(filterItem("downloads"));
     downloads_->selectRow(model_->rowCount() - 1);
     updateSummary();
     applyFilters();
@@ -984,7 +794,7 @@ void MainWindow::addUpload()
 
     QFileInfo info(path);
     QList<QStandardItem *> items;
-    auto *fileItem = new QStandardItem(coloredIcon("upload"), info.fileName());
+    auto *fileItem = new QStandardItem(transferIcon("upload"), info.fileName());
     fileItem->setData(address.toString(), UrlRole);
     fileItem->setData(QUuid::createUuid().toString(QUuid::WithoutBraces),
                       IdRole);
@@ -1000,7 +810,7 @@ void MainWindow::addUpload()
           << new QStandardItem(address.toString());
     model_->appendRow(items);
     markTransfersDirty();
-    folders_->setCurrentItem(folders_->topLevelItem(3)->child(0));
+    folders_->setCurrentItem(filterItem("uploads_active"));
     downloads_->selectRow(model_->rowCount() - 1);
     updateSummary();
     applyFilters();
@@ -1043,7 +853,8 @@ void MainWindow::showTransferMenu(const QPoint &position)
               multiple || active || state == "Queued" || state == "Paused" || state == "Failed");
     addAction(tr("Remove"), &MainWindow::removeSelected);
     addAction(tr("Download Again"), &MainWindow::downloadAgainSelected,
-              !multiple && state == "Complete" && item->data(DirectionRole).toString() == "download");
+              !multiple && state == "Complete" &&
+              item->data(DirectionRole).toString() == "download");
     menu.addSeparator();
     QAction *copy = menu.addAction(multiple ? tr("Copy URLs") : tr("Copy URL"));
     connect(copy, &QAction::triggered, this, [this]() {
@@ -1334,6 +1145,9 @@ void MainWindow::updateProgress(qint64 received, qint64 total, qint64 speed)
     auto *nameItem = model_->item(activeRow_, NameColumn);
     nameItem->setData(received, ReceivedRole);
     nameItem->setData(total, TotalRole);
+    model_->item(activeRow_, ProgressColumn)->setText(total > 0
+        ? QStringLiteral("%1%").arg(qBound(0, int(100.0 * received / total), 100)) : tr("—"));
+    model_->item(activeRow_, ProgressColumn)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     nameItem->setData(speed, SpeedRole);
     model_->item(activeRow_, SizeColumn)->setText(
         total > 0 ? QLocale().formattedDataSize(total) : tr("Unknown"));
@@ -1343,7 +1157,7 @@ void MainWindow::updateProgress(qint64 received, qint64 total, qint64 speed)
         total > received && speed > 0
             ? QTime(0, 0).addSecs(int((total - received) / speed))
                   .toString("hh:mm:ss")
-            : total <= received ? tr("0:00:00") : tr("—"));
+            : total >= 0 && total <= received ? tr("0:00:00") : tr("—"));
     setRowState(activeRow_, tr("Downloading"));
     markTransfersDirty();
     downloads_->viewport()->update();
@@ -1413,17 +1227,24 @@ void MainWindow::setRowState(int row, const QString &state)
         return;
     auto *item = model_->item(row, NameColumn);
     item->setData(state, StateRole);
+    if (state != "Downloading" && state != "Connecting") {
+        item->setData(qint64(0), SpeedRole);
+        model_->item(row, SpeedColumn)->setText(tr("—"));
+        model_->item(row, RemainingColumn)->setText(tr("—"));
+    }
+    if (state == "Complete")
+        model_->item(row, ProgressColumn)->setText("100%");
     if (state == tr("Complete"))
         item->setData(QDateTime::currentDateTime(), CompletedRole);
     model_->item(row, StatusColumn)->setText(state == "Downloading" &&
         item->data(DirectionRole).toString() == "upload" ? tr("Uploading") : state);
     model_->item(row, StatusColumn)->setToolTip(item->data(ErrorRole).toString());
     const QIcon icon = state == tr("Complete")
-                           ? standardIcon(this, QStyle::SP_DialogApplyButton)
+                           ? transferIcon("complete")
                            : state == tr("Downloading") || state == tr("Connecting")
-                                 ? coloredIcon("start")
+                                 ? transferIcon("start")
                                  : state == tr("Stopped") || state == tr("Paused")
-                                       ? coloredIcon("pause")
+                                       ? transferIcon("pause")
                                        : standardIcon(this, QStyle::SP_FileIcon);
     item->setIcon(icon);
 
@@ -1441,6 +1262,13 @@ void MainWindow::updateSummary()
     for (int row = 0; row < model_->rowCount(); ++row) {
         auto *item = model_->item(row, NameColumn);
         const QString state = item->data(StateRole).toString();
+        auto *order = model_->item(row, OrderColumn);
+        if (!order) {
+            order = new QStandardItem;
+            order->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            model_->setItem(row, OrderColumn, order);
+        }
+        order->setText(QString::number(row + 1));
         active += state == "Downloading" || state == "Connecting";
         complete += state == "Complete";
         uploads += item->data(DirectionRole).toString() == "upload";
@@ -1556,7 +1384,8 @@ void MainWindow::saveTransfers()
         transfer.insert("direction", direction);
         transfer.insert("state", state);
         transfer.insert("etag", QString::fromLatin1(item->data(EtagRole).toByteArray()));
-        transfer.insert("lastModified", QString::fromLatin1(item->data(ModifiedRole).toByteArray()));
+        transfer.insert("lastModified",
+                        QString::fromLatin1(item->data(ModifiedRole).toByteArray()));
         transfer.insert("error", item->data(ErrorRole).toString());
         transfer.insert("restartRequested", item->data(RestartRole).toBool());
         transfer.insert("bytesReceived", QString::number(received));
@@ -1639,13 +1468,13 @@ void MainWindow::loadTransfers()
             : saved.value("folder").toString();
 
         const QIcon icon = state == "Complete"
-            ? standardIcon(this, QStyle::SP_DialogApplyButton)
+            ? transferIcon("complete")
             : state == "Downloading" || state == "Connecting"
-                ? coloredIcon("start")
+                ? transferIcon("start")
                 : state == "Paused" || state == "Stopped"
-                    ? coloredIcon("pause")
+                    ? transferIcon("pause")
                     : direction == "upload"
-                        ? coloredIcon("upload")
+                        ? transferIcon("upload")
                         : standardIcon(this, QStyle::SP_FileIcon);
         auto *fileItem = new QStandardItem(icon, name);
         fileItem->setData(saved.value("id").toString(), IdRole);
@@ -1667,7 +1496,7 @@ void MainWindow::loadTransfers()
         fileItem->setData(number("elapsedSeconds"), ElapsedRole);
 
         const int percent = total > 0
-            ? qBound(0, int(received * 100 / total), 100) : 0;
+            ? qBound(0, int(100.0 * received / total), 100) : 0;
         QList<QStandardItem *> items;
         items << fileItem
               << new QStandardItem(total > 0

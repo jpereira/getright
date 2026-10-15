@@ -14,6 +14,7 @@
 
 class TransferJob;
 class QDialog;
+class QFormLayout;
 class QCloseEvent;
 class QLabel;
 class QLineEdit;
@@ -22,6 +23,7 @@ class QPushButton;
 class QStandardItemModel;
 class QTableView;
 class QTreeWidget;
+class QTreeWidgetItem;
 class QTimer;
 class QSystemTrayIcon;
 
@@ -43,11 +45,12 @@ private:
     friend class WindowTests;
 
     enum Column { NameColumn, SizeColumn, StatusColumn, ProgressColumn,
-                  SpeedColumn, RemainingColumn, UrlColumn };
+                  SpeedColumn, RemainingColumn, UrlColumn, OrderColumn };
     enum Role { UrlRole = Qt::UserRole + 1, PathRole, StateRole,
                 ReceivedRole, TotalRole, RemoveWhenStoppedRole,
                 DirectionRole, AddedRole, CompletedRole, SpeedRole,
-                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole, AutoStartRole, EtagRole, ModifiedRole, ErrorRole };
+                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole, AutoStartRole,
+                EtagRole, ModifiedRole, ErrorRole };
 
     void addDownload();
     void addUpload();
@@ -76,6 +79,7 @@ private:
     void saveSettings();
     void markTransfersDirty();
     void ensureFolderFilter(const QString &folder);
+    QTreeWidgetItem *filterItem(const QString &key) const;
     void showHelp();
     void showDataFolder();
     void openLocalFile(const QString &path);
@@ -106,7 +110,7 @@ private:
     QSystemTrayIcon *trayIcon_ = nullptr;
     QPointer<QDialog> transferDialog_;
     QPointer<QWidget> completionPopup_;
-    QLabel *transferName_ = nullptr;
+    QFormLayout *transferForm_ = nullptr;
     QLineEdit *transferUrl_ = nullptr;
     QLineEdit *transferPath_ = nullptr;
     QLabel *transferAmount_ = nullptr;
@@ -114,7 +118,6 @@ private:
     QLabel *transferSpeed_ = nullptr;
     QLabel *transferElapsed_ = nullptr;
     QLabel *transferRemaining_ = nullptr;
-    QLabel *transferPercent_ = nullptr;
     QProgressBar *transferProgress_ = nullptr;
     QPushButton *transferPause_ = nullptr;
     QPersistentModelIndex transferDialogIndex_;
