@@ -848,9 +848,13 @@ void MainWindow::ensureFolderFilter(const QString &folder)
 void MainWindow::addDownload()
 {
     bool accepted = false;
+    const QString clipboardText = QApplication::clipboard()->text().trimmed();
+    const QUrl clipboardUrl(clipboardText);
+    const bool hasUrl = clipboardUrl.isValid() && !clipboardUrl.host().isEmpty() &&
+        (clipboardUrl.scheme() == "http" || clipboardUrl.scheme() == "https");
     const QString text = QInputDialog::getText(
         this, tr("Add download"), tr("URL:"), QLineEdit::Normal,
-        QString(), &accepted).trimmed();
+        hasUrl ? clipboardText : QString(), &accepted).trimmed();
     if (!accepted || text.isEmpty())
         return;
 

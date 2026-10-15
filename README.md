@@ -101,6 +101,9 @@ between sessions. On macOS, the Windows styles are visual approximations built w
 Qt Fusion controls. The native macOS style follows the selected application color scheme;
 the Windows styles use matching palettes and button colors.
 
+**Add** prefills its URL field with a valid HTTP/HTTPS address from the clipboard.
+Review or edit it before confirming.
+
 Use **Pause** to suspend a download and **Start** to resume it. Double-click a row to open
 the transfer progress window. Right-click a row to control the transfer or copy its URL.
 **Move To** selects another destination folder and moves any existing partial or completed
