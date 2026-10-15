@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# Copyright (C) 2026 Jorge Pereira
+# Author: Jorge Pereira <jpereiran@gmail.com>
+# Date: 2026-10-14
+# Description: Qt application build and macOS bundle configuration.
+
 cmake_minimum_required(VERSION 3.21)
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" GETRIGHT_VERSION LIMIT_COUNT 1)
 string(REGEX REPLACE "^v" "" GETRIGHT_VERSION "${GETRIGHT_VERSION}")

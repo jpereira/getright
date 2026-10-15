@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-only
+# Copyright (C) 2026 Jorge Pereira
+# Author: Jorge Pereira <jpereiran@gmail.com>
+# Date: 2026-10-14
+# Description: Pack PNG icon sizes into a macOS ICNS file.
+
 """Pack PNG icon representations into a macOS ICNS container."""
 
 from pathlib import Path

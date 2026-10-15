@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# Copyright (C) 2026 Jorge Pereira
+# Author: Jorge Pereira <jpereiran@gmail.com>
+# Date: 2026-10-14
+# Description: Build, package, and capture the macOS application.
+
 .DEFAULT_GOAL := help
 .PHONY: help osx osx-dmg screenshots clean
 

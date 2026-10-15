@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// Copyright (C) 2026 Jorge Pereira
+// Author: Jorge Pereira <jpereiran@gmail.com>
+// Date: 2026-10-14
+// Description: Application startup and command-line options.
+
 #include "main_window.h"
 
 #include <QApplication>
