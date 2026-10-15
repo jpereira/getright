@@ -1,0 +1,3 @@
+* Port to Windows 11.
+* Port to Linux with Ubuntu and Debian packages.
+* Port to Android and generate an APK.
