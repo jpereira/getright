@@ -26,6 +26,11 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
     setAttribute(Qt::WA_ShowWithoutActivating);
     setAttribute(Qt::WA_DeleteOnClose);
     setFrameStyle(QFrame::Box | QFrame::Plain);
+    QFont tipFont = font();
+    tipFont.setPointSize(10);
+    setFont(tipFont);
+    setStyleSheet(QStringLiteral(
+        "QToolButton { border: none; background: transparent; padding: 0; }"));
     setAutoFillBackground(true);
     QPalette colors = palette();
     const bool dark = colors.color(QPalette::Window).lightness() < 128;
@@ -47,6 +52,7 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
     close->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
     close->setToolTip(tr("Dismiss notification"));
     close->setAutoRaise(true);
+    close->setFixedSize(14, 14);
     connect(close, &QToolButton::clicked, this, &QWidget::close);
     heading->addWidget(close);
     layout->addLayout(heading);
@@ -54,7 +60,7 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
     auto *body = new QHBoxLayout;
     auto *image = new QToolButton(this);
     image->setIcon(icon);
-    image->setIconSize(QSize(38, 38));
+    image->setIconSize(QSize(32, 32));
     image->setAutoRaise(true);
     image->setToolTip(tr("Open downloaded file"));
     connect(image, &QToolButton::clicked, this, &CompletionPopup::openRequested);
@@ -69,9 +75,9 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
     body->addWidget(text, 1);
     layout->addLayout(body);
     auto *actions = new QHBoxLayout;
-    auto *open = new QPushButton(tr("Click here to open this file."), this);
-    open->setFlat(true);
-    connect(open, &QPushButton::clicked, this, &CompletionPopup::openRequested);
+    auto *open = new QLabel(tr("<a href=\"open\">Click here to open this file.</a>"), this);
+    open->setTextInteractionFlags(Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
+    connect(open, &QLabel::linkActivated, this, &CompletionPopup::openRequested);
     actions->addWidget(open, 1);
     auto *folder = new QToolButton(this);
     folder->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
