@@ -40,6 +40,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
+    friend class WindowTests;
+
     enum Column { NameColumn, SizeColumn, StatusColumn, ProgressColumn,
                   SpeedColumn, RemainingColumn, UrlColumn };
     enum Role { UrlRole = Qt::UserRole + 1, PathRole, StateRole,
@@ -51,6 +53,7 @@ private:
     void addUpload();
     void startSelected();
     void startNext();
+    void startRow(int row);
     void pauseSelected();
     void pauseAll();
     void resumeAll();

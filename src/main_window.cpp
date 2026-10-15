@@ -1008,7 +1008,9 @@ void MainWindow::showTransferMenu(const QPoint &position)
     if (!clicked.isValid())
         return;
     const QPersistentModelIndex index = model_->index(clicked.row(), NameColumn);
-    downloads_->selectRow(index.row());
+    if (!downloads_->selectionModel()->isRowSelected(index.row(), QModelIndex()))
+        downloads_->selectRow(index.row());
+    const bool multiple = downloads_->selectionModel()->selectedRows().size() > 1;
     const auto *item = model_->item(index.row(), NameColumn);
     const QString state = item->data(StateRole).toString();
     const bool active = activeJob_ && index.row() == activeRow_;
@@ -1020,18 +1022,17 @@ void MainWindow::showTransferMenu(const QPoint &position)
         connect(action, &QAction::triggered, this, [this, index, operation]() {
             if (!index.isValid())
                 return;
-            downloads_->selectRow(index.row());
             (this->*operation)();
         });
     };
     addAction(tr("Start"), &MainWindow::startSelected,
-              !activeJob_ && state != "Complete");
-    addAction(tr("Pause"), &MainWindow::pauseSelected, active || state == "Queued");
+              multiple || state != "Complete");
+    addAction(tr("Pause"), &MainWindow::pauseSelected, multiple || active || state == "Queued");
     addAction(tr("Stop"), &MainWindow::stopSelected,
-              active || state == "Queued" || state == "Paused" || state == "Failed");
+              multiple || active || state == "Queued" || state == "Paused" || state == "Failed");
     addAction(tr("Remove"), &MainWindow::removeSelected);
     addAction(tr("Download Again"), &MainWindow::downloadAgainSelected,
-              state == "Complete" && item->data(DirectionRole).toString() == "download");
+              !multiple && state == "Complete" && item->data(DirectionRole).toString() == "download");
     menu.addSeparator();
     QAction *copy = menu.addAction(tr("Copy URL"));
     connect(copy, &QAction::triggered, this, [index]() {
@@ -1039,7 +1040,8 @@ void MainWindow::showTransferMenu(const QPoint &position)
             QApplication::clipboard()->setText(index.data(UrlRole).toString());
     });
     addAction(tr("Move To"), &MainWindow::moveSelected,
-              item->data(DirectionRole).toString() == "download" && !movingIndex_.isValid());
+              !multiple && item->data(DirectionRole).toString() == "download" &&
+              !movingIndex_.isValid());
     menu.exec(downloads_->viewport()->mapToGlobal(position));
 }
 
@@ -1137,11 +1139,20 @@ void MainWindow::downloadAgainSelected()
 
 void MainWindow::startSelected()
 {
-    int row = selectedRow();
-    if (row < 0) {
-        startNext();
-        return;
+    const auto rows = downloads_->selectionModel()->selectedRows();
+    for (const auto &index : rows) {
+        auto *item = model_->item(index.row(), NameColumn);
+        const QString state = item->data(StateRole).toString();
+        if (state == "Complete" || index.row() == activeRow_)
+            continue;
+        item->setData(true, AutoStartRole);
+        setRowState(index.row(), "Queued");
     }
+    startNext();
+}
+
+void MainWindow::startRow(int row)
+{
     const QString state = model_->item(row, NameColumn)->data(StateRole).toString();
     if (state == "Complete" || state == "Downloading")
         return;
@@ -1190,8 +1201,7 @@ void MainWindow::startNext()
         const bool resumeUpload = model_->item(row, NameColumn)
                                       ->data(AutoStartRole).toBool();
         if (state == "Queued" && (!upload || resumeUpload)) {
-            downloads_->selectRow(row);
-            startSelected();
+            startRow(row);
             return;
         }
     }
@@ -1199,17 +1209,20 @@ void MainWindow::startNext()
 
 void MainWindow::pauseSelected()
 {
-    const int row = selectedRow();
-    if (row < 0)
-        return;
-    const QString state = model_->item(row, NameColumn)
-                              ->data(StateRole).toString();
-    if (row == activeRow_ && activeJob_ &&
-        (state == "Downloading" || state == "Connecting")) {
+    bool pauseActive = false;
+    const auto rows = downloads_->selectionModel()->selectedRows();
+    for (const auto &index : rows) {
+        auto *item = model_->item(index.row(), NameColumn);
+        if (index.row() == activeRow_) {
+            pauseActive = true;
+        } else if (item->data(StateRole).toString() == "Queued") {
+            item->setData(false, AutoStartRole);
+            setRowState(index.row(), "Paused");
+        }
+    }
+    if (pauseActive && activeJob_) {
         pausing_ = true;
         activeJob_->cancel();
-    } else if (state == "Queued") {
-        setRowState(row, tr("Paused"));
     }
 }
 
@@ -1246,35 +1259,46 @@ void MainWindow::resumeAll()
 
 void MainWindow::stopSelected()
 {
-    const int row = selectedRow();
-    if (row < 0)
-        return;
-    if (activeJob_ && row == activeRow_) {
+    bool stopActive = false;
+    const auto rows = downloads_->selectionModel()->selectedRows();
+    for (const auto &index : rows) {
+        auto *item = model_->item(index.row(), NameColumn);
+        const QString state = item->data(StateRole).toString();
+        item->setData(false, AutoStartRole);
+        if (index.row() == activeRow_)
+            stopActive = true;
+        else if (state == "Queued" || state == "Paused" || state == "Failed")
+            setRowState(index.row(), "Stopped");
+    }
+    if (stopActive && activeJob_) {
         stopping_ = true;
         activeJob_->cancel();
-        return;
     }
-    const QString state = model_->item(row, NameColumn)->data(StateRole).toString();
-    if (state == "Queued" || state == "Paused" || state == "Failed")
-        setRowState(row, tr("Stopped"));
 }
 
 void MainWindow::removeSelected()
 {
-    const QModelIndexList selected = downloads_->selectionModel()->selectedRows();
-    for (auto it = selected.crbegin(); it != selected.crend(); ++it) {
-        const int row = it->row();
+    QList<QPersistentModelIndex> selected;
+    for (const auto &index : downloads_->selectionModel()->selectedRows())
+        selected.append(QPersistentModelIndex(index));
+    bool removeActive = false;
+    for (const auto &index : selected) {
+        const int row = index.row();
         if (activeJob_ && row == activeRow_) {
             model_->item(row, NameColumn)->setData(true, RemoveWhenStoppedRole);
-            stopping_ = true;
-            activeJob_->cancel();
+            removeActive = true;
         } else {
             model_->removeRow(row);
             if (activeJob_ && row < activeRow_)
                 --activeRow_;
         }
     }
+    if (removeActive && activeJob_) {
+        stopping_ = true;
+        activeJob_->cancel();
+    }
     updateSummary();
+    updateDetails();
     markTransfersDirty();
 }
 
