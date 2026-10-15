@@ -1605,13 +1605,14 @@ void MainWindow::showAbout()
     about.setTextFormat(Qt::RichText);
     about.setIconPixmap(windowIcon().pixmap(96, 96));
     about.setText(QStringLiteral(
-            "<h3>GetRight Port</h3>"
+            "<h3>GetRight Port v%1</h3>"
             "<p><b>Author:</b> Jorge Pereira &lt;"
             "<a href=\"mailto:jpereiran@gmail.com\">jpereiran@gmail.com</a>&gt;</p>"
             "<p><b>Project:</b> <a href=\"https://github.com/jpereira/getright\">"
             "https://github.com/jpereira/getright</a></p>"
             "<p>Open source software, licensed under the GNU Lesser General "
             "Public License (LGPL), version 3.</p>"
-            "<p>A cross-platform study port inspired by GetRight 6.5.</p>"));
+            "<p>A cross-platform study port inspired by GetRight 6.5.</p>")
+                .arg(QApplication::applicationVersion()));
     about.exec();
 }

@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
-project(GetRightPort VERSION 0.1.0 LANGUAGES CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" GETRIGHT_VERSION LIMIT_COUNT 1)
+string(REGEX REPLACE "^v" "" GETRIGHT_VERSION "${GETRIGHT_VERSION}")
+project(GetRightPort VERSION "${GETRIGHT_VERSION}" LANGUAGES CXX)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS VERSION)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,6 +37,7 @@ set_source_files_properties("${APP_ICON}" PROPERTIES
 )
 
 target_link_libraries(getright-port PRIVATE Qt6::Widgets Qt6::Network)
+target_compile_definitions(getright-port PRIVATE GETRIGHT_VERSION="${PROJECT_VERSION}")
 
 if(APPLE)
     enable_language(OBJCXX)
@@ -45,5 +49,7 @@ set_target_properties(getright-port PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_GUI_IDENTIFIER org.personal.getright-port
     MACOSX_BUNDLE_BUNDLE_NAME "GetRight Port"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_ICON_FILE "GetRightPort.icns"
 )

@@ -14,10 +14,12 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName("GetRight Port");
+    QApplication::setApplicationVersion(QStringLiteral(GETRIGHT_VERSION));
     QApplication::setOrganizationName("Jorge Pereira");
 
     QCommandLineParser parser;
     parser.addHelpOption();
+    parser.addVersionOption();
     QCommandLineOption themeOption(
         "theme", "Set the preview theme: system, light, or dark.", "theme");
     QCommandLineOption screenshotOption(
