@@ -65,10 +65,16 @@ osx-dmg:
 	@echo "DMG created: $(DMG_PATH)"
 
 screenshots: osx
-	@mkdir -p screenshots
-	QT_QPA_PLATFORM=offscreen \
-	  "$(BUILD_DIR)/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)" \
-	  --screenshot screenshots/getright.png
+	@command -v ffmpeg >/dev/null || \
+	  { echo 'Install ffmpeg to encode the live download GIF.' >&2; exit 1; }
+	git archive --format=zip -o "$(BUILD_DIR)/screenshot-source.zip" HEAD
+	"$(BUILD_DIR)/capture-screenshots" "$(BUILD_DIR)/screenshot-source.zip" site/assets
+	rm -rf "$(BUILD_DIR)/gif-frames"
+	"$(BUILD_DIR)/capture-screenshots" "$(BUILD_DIR)/screenshot-source.zip" \
+	  "$(BUILD_DIR)/gif-frames" --animation
+	ffmpeg -y -loglevel error -framerate 10 -i "$(BUILD_DIR)/gif-frames/frame-%04d.png" \
+	  -filter_complex 'split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer' \
+	  -loop 0 site/assets/port-download.gif
 
 clean:
 	rm -rf "$(BUILD_DIR)"

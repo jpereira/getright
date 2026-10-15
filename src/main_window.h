@@ -44,6 +44,7 @@ protected:
 
 private:
     friend class WindowTests;
+    friend class ScreenshotCapture;
 
     enum Column { NameColumn, SizeColumn, StatusColumn, ProgressColumn,
                   SpeedColumn, RemainingColumn, UrlColumn, OrderColumn };
