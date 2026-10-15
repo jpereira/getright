@@ -175,6 +175,59 @@ private slots:
         QVERIFY(!run(spec).isEmpty());
     }
 
+    void lastModifiedResume()
+    {
+        write("OLD");
+        response_ = "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 3-5/6\r\n"
+                    "Content-Length: 3\r\n\r\nNEW";
+        auto spec = request(false);
+        spec.lastModified = "Wed, 14 Oct 2026 12:00:00 GMT";
+        QCOMPARE(run(spec), QString());
+        QCOMPARE(read(), QByteArray("OLDNEW"));
+        QVERIFY(requestBytes_.contains("If-Range: Wed, 14 Oct 2026 12:00:00 GMT"));
+    }
+
+    void weakEtagRestarts()
+    {
+        write("OLD");
+        response_ = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nNEW";
+        auto spec = request();
+        spec.etag = "W/\"version-one\"";
+        QCOMPARE(run(spec), QString());
+        QCOMPARE(read(), QByteArray("NEW"));
+        QVERIFY(!requestBytes_.contains("Range:"));
+    }
+
+    void uploadUsesPutAndPreservesSource()
+    {
+        write("SOURCE");
+        response_ = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+        auto spec = request();
+        spec.upload = true;
+        QCOMPARE(run(spec), QString());
+        QVERIFY(requestBytes_.startsWith("PUT /file "));
+        QCOMPARE(read(), QByteArray("SOURCE"));
+    }
+
+    void missingUploadFailsAsynchronously()
+    {
+        auto spec = request();
+        spec.upload = true;
+        QVERIFY(!run(spec).isEmpty());
+    }
+
+    void cancellationPreservesUntouchedPartial()
+    {
+        write("OLD");
+        TransferJob job;
+        QSignalSpy done(&job, &TransferJob::finished);
+        job.start(request());
+        job.cancel();
+        if (done.isEmpty())
+            QVERIFY(done.wait(5000));
+        QCOMPARE(read(), QByteArray("OLD"));
+    }
+
     void writeFailure()
     {
 #ifdef Q_OS_UNIX
