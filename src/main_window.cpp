@@ -153,6 +153,15 @@ QIcon coloredIcon(const QString &kind)
     return QIcon(pixmap);
 }
 
+void setDetailText(QLineEdit *field, const QString &text)
+{
+    if (field->text() == text)
+        return;
+    field->setText(text);
+    field->setToolTip(text);
+    field->setCursorPosition(0);
+}
+
 } // namespace
 
 void MainWindow::applyTheme(const QString &theme)
@@ -268,8 +277,8 @@ MainWindow::MainWindow(QWidget *parent)
       summary_(new QLabel(this)),
       urlStatus_(new QLabel(this)),
       detailName_(new QLabel(this)),
-      detailUrl_(new QLabel(this)),
-      detailPath_(new QLabel(this)),
+      detailUrl_(new QLineEdit(this)),
+      detailPath_(new QLineEdit(this)),
       detailTransfer_(new QLabel(this)),
       detailSpeed_(new QLabel(this)),
       detailElapsed_(new QLabel(this)),
@@ -384,12 +393,14 @@ MainWindow::MainWindow(QWidget *parent)
     contentLayout->addWidget(downloads_, 1);
     auto *details = new QGroupBox(tr("Download details"), content);
     auto *detailLayout = new QFormLayout(details);
+    detailLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     detailName_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    detailUrl_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    detailPath_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    detailUrl_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    detailUrl_->setWordWrap(true);
-    detailPath_->setWordWrap(true);
+    for (QLineEdit *field : {detailUrl_, detailPath_}) {
+        field->setReadOnly(true);
+        field->setMinimumWidth(0);
+    }
+    detailUrl_->setObjectName("downloadAddress");
+    detailPath_->setObjectName("downloadLocalPath");
     detailProgress_->setRange(0, 100);
     detailProgress_->setValue(0);
     detailPercent_->setMinimumWidth(48);
@@ -630,8 +641,8 @@ void MainWindow::updateDetails()
         row = activeRow_;
     if (row < 0 || row >= model_->rowCount()) {
         detailName_->setText(tr("No download selected"));
-        detailUrl_->clear();
-        detailPath_->clear();
+        setDetailText(detailUrl_, {});
+        setDetailText(detailPath_, {});
         detailTransfer_->clear();
         detailSpeed_->clear();
         detailElapsed_->clear();
@@ -652,8 +663,8 @@ void MainWindow::updateDetails()
                             ? qBound(0, int(received * 100 / total), 100)
                             : 0;
     detailName_->setText(item->text());
-    detailUrl_->setText(item->data(UrlRole).toString());
-    detailPath_->setText(item->data(PathRole).toString());
+    setDetailText(detailUrl_, item->data(UrlRole).toString());
+    setDetailText(detailPath_, item->data(PathRole).toString());
     detailTransfer_->setText(total > 0
         ? QStringLiteral("%1 of %2")
               .arg(QLocale().formattedDataSize(received),
@@ -683,17 +694,19 @@ void MainWindow::showTransferDetails(int row)
 
         auto *layout = new QVBoxLayout(dialog);
         auto *form = new QFormLayout;
+        form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         transferName_ = new QLabel(dialog);
-        transferUrl_ = new QLabel(dialog);
-        transferPath_ = new QLabel(dialog);
+        transferUrl_ = new QLineEdit(dialog);
+        transferPath_ = new QLineEdit(dialog);
         transferAmount_ = new QLabel(dialog);
         transferSpeed_ = new QLabel(dialog);
         transferElapsed_ = new QLabel(dialog);
         transferRemaining_ = new QLabel(dialog);
-        transferUrl_->setWordWrap(true);
-        transferPath_->setWordWrap(true);
-        for (QLabel *label : {transferName_, transferUrl_, transferPath_})
-            label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        for (QLineEdit *field : {transferUrl_, transferPath_}) {
+            field->setReadOnly(true);
+            field->setMinimumWidth(0);
+        }
+        transferName_->setTextInteractionFlags(Qt::TextSelectableByMouse);
         form->addRow(tr("File:"), transferName_);
         form->addRow(tr("Address:"), transferUrl_);
         form->addRow(tr("Save to:"), transferPath_);
@@ -789,8 +802,8 @@ void MainWindow::updateTransferDialog()
     transferDialog_->setWindowTitle(tr("Transfer Progress — %1")
                                         .arg(item->text()));
     transferName_->setText(item->text());
-    transferUrl_->setText(item->data(UrlRole).toString());
-    transferPath_->setText(item->data(PathRole).toString());
+    setDetailText(transferUrl_, item->data(UrlRole).toString());
+    setDetailText(transferPath_, item->data(PathRole).toString());
     transferAmount_->setText(total > 0
         ? QStringLiteral("%1 of %2")
               .arg(QLocale().formattedDataSize(received),
@@ -1390,6 +1403,12 @@ void MainWindow::loadTransfers()
     }
     transfersDirty_ = false;
     applyFilters();
+    for (int row = 0; row < model_->rowCount(); ++row) {
+        if (!downloads_->isRowHidden(row)) {
+            downloads_->selectRow(row);
+            break;
+        }
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

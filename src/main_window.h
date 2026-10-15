@@ -73,8 +73,8 @@ private:
     QLabel *summary_;
     QLabel *urlStatus_;
     QLabel *detailName_;
-    QLabel *detailUrl_;
-    QLabel *detailPath_;
+    QLineEdit *detailUrl_;
+    QLineEdit *detailPath_;
     QLabel *detailTransfer_;
     QLabel *detailSpeed_;
     QLabel *detailElapsed_;
@@ -85,8 +85,8 @@ private:
     QTimer *persistenceTimer_ = nullptr;
     QPointer<QDialog> transferDialog_;
     QLabel *transferName_ = nullptr;
-    QLabel *transferUrl_ = nullptr;
-    QLabel *transferPath_ = nullptr;
+    QLineEdit *transferUrl_ = nullptr;
+    QLineEdit *transferPath_ = nullptr;
     QLabel *transferAmount_ = nullptr;
     QLabel *transferSpeed_ = nullptr;
     QLabel *transferElapsed_ = nullptr;
