@@ -16,6 +16,8 @@ filters on the left, a task list, a toolbar, detailed progress, and menus.
 - Local file uploads to HTTP/HTTPS destinations that accept `PUT`.
 - Start, stop, resume, remove, and monitor transfers.
 - Pause and resume downloads while preserving partial files.
+- Right-click a transfer for Start, Pause, Stop, Remove, Copy URL, and Move To.
+- Move downloads to another folder, preserving partial files and resuming active transfers.
 - Double-click a transfer to open a window with its file, address, destination,
   progress, speed, elapsed time, and estimated time remaining.
 - Details panel with URL, local destination, size, percentage, speed, and timing.
@@ -100,7 +102,13 @@ Qt Fusion controls. The native macOS style follows the selected application colo
 the Windows styles use matching palettes and button colors.
 
 Use **Pause** to suspend a download and **Start** to resume it. Double-click a row to open
-the transfer progress window. **Upload** asks for a local file and an HTTP/HTTPS destination;
+the transfer progress window. Right-click a row to control the transfer or copy its URL.
+**Move To** selects another destination folder and moves any existing partial or completed
+file there. An active download pauses during the move and resumes afterward. Existing
+destination files are preserved; choose another folder if the name is already in use.
+If the move fails, an active download stays paused at its original destination.
+
+**Upload** asks for a local file and an HTTP/HTTPS destination;
 select the task and press **Start** to send it using `PUT`.
 
 The executable accepts `--screenshot path.png` to save the current interface.

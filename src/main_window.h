@@ -47,6 +47,9 @@ private:
     void pauseSelected();
     void stopSelected();
     void removeSelected();
+    void showTransferMenu(const QPoint &position);
+    void moveSelected();
+    bool moveTransfer(const QPersistentModelIndex &index, const QString &destination);
     void updateProgress(qint64 received, qint64 total);
     void receiveData();
     void finishDownload();
@@ -94,6 +97,9 @@ private:
     QProgressBar *transferProgress_ = nullptr;
     QPushButton *transferPause_ = nullptr;
     QPersistentModelIndex transferDialogIndex_;
+    QPersistentModelIndex movingIndex_;
+    QString moveDestination_;
+    bool resumeAfterMove_ = false;
     QString transfersFile_;
     QString settingsFile_;
     QJsonObject settings_;

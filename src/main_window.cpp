@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QDateTime>
 #include <QCloseEvent>
+#include <QClipboard>
 #include <QDialog>
 #include <QDesktopServices>
 #include <QDir>
@@ -23,6 +24,7 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QMenuBar>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
 #include <QProgressBar>
@@ -317,6 +319,9 @@ MainWindow::MainWindow(QWidget *parent)
         {tr("File"), tr("Size"), tr("Status"), tr("Progress"),
          tr("Speed"), tr("Time left"), tr("Address")});
     downloads_->setModel(model_);
+    downloads_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(downloads_, &QWidget::customContextMenuRequested,
+            this, &MainWindow::showTransferMenu);
     downloads_->setItemDelegateForColumn(ProgressColumn,
                                          new ProgressDelegate(downloads_));
     downloads_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -952,6 +957,114 @@ int MainWindow::selectedRow() const
     return rows.isEmpty() ? -1 : rows.first().row();
 }
 
+void MainWindow::showTransferMenu(const QPoint &position)
+{
+    const QModelIndex clicked = downloads_->indexAt(position);
+    if (!clicked.isValid())
+        return;
+    const QPersistentModelIndex index = model_->index(clicked.row(), NameColumn);
+    downloads_->selectRow(index.row());
+    const auto *item = model_->item(index.row(), NameColumn);
+    const QString state = item->data(StateRole).toString();
+    const bool active = activeReply_ && index.row() == activeRow_;
+
+    QMenu menu(this);
+    const auto addAction = [&](const QString &text, auto operation, bool enabled = true) {
+        QAction *action = menu.addAction(text);
+        action->setEnabled(enabled);
+        connect(action, &QAction::triggered, this, [this, index, operation]() {
+            if (!index.isValid())
+                return;
+            downloads_->selectRow(index.row());
+            (this->*operation)();
+        });
+    };
+    addAction(tr("Start"), &MainWindow::startSelected,
+              !activeReply_ && state != "Complete");
+    addAction(tr("Pause"), &MainWindow::pauseSelected, active || state == "Queued");
+    addAction(tr("Stop"), &MainWindow::stopSelected,
+              active || state == "Queued" || state == "Paused" || state == "Failed");
+    addAction(tr("Remove"), &MainWindow::removeSelected);
+    menu.addSeparator();
+    QAction *copy = menu.addAction(tr("Copy URL"));
+    connect(copy, &QAction::triggered, this, [index]() {
+        if (index.isValid())
+            QApplication::clipboard()->setText(index.data(UrlRole).toString());
+    });
+    addAction(tr("Move To"), &MainWindow::moveSelected,
+              item->data(DirectionRole).toString() == "download" && !movingIndex_.isValid());
+    menu.exec(downloads_->viewport()->mapToGlobal(position));
+}
+
+void MainWindow::moveSelected()
+{
+    const int row = selectedRow();
+    if (row < 0 || movingIndex_.isValid())
+        return;
+    const QPersistentModelIndex index = model_->index(row, NameColumn);
+    if (index.data(DirectionRole).toString() != "download")
+        return;
+    const QString source = index.data(PathRole).toString();
+    const QString directory = QFileDialog::getExistingDirectory(
+        this, tr("Move download to"), QFileInfo(source).absolutePath());
+    if (directory.isEmpty() || !index.isValid())
+        return;
+    const QString destination = QDir(directory).filePath(QFileInfo(source).fileName());
+    if (QFileInfo(destination).absoluteFilePath() == QFileInfo(source).absoluteFilePath())
+        return;
+    if (QFileInfo::exists(destination)) {
+        QMessageBox::warning(this, tr("Cannot move download"),
+                             tr("A file with this name already exists in the selected folder."));
+        return;
+    }
+
+    if (activeReply_ && index.row() == activeRow_) {
+        movingIndex_ = index;
+        moveDestination_ = destination;
+        resumeAfterMove_ = true;
+        pausing_ = true;
+        activeReply_->abort();
+    } else {
+        moveTransfer(index, destination);
+    }
+}
+
+bool MainWindow::moveTransfer(const QPersistentModelIndex &index, const QString &destination)
+{
+    if (!index.isValid())
+        return false;
+    const QString source = index.data(PathRole).toString();
+    if (QFileInfo::exists(destination)) {
+        QMessageBox::warning(this, tr("Cannot move download"),
+                             tr("The destination already exists. Choose another folder."));
+        return false;
+    }
+    QFile file(source);
+    if (file.exists() && !file.rename(destination)) {
+        QMessageBox::warning(this, tr("Cannot move download"), file.errorString());
+        return false;
+    }
+    if (!file.exists() && index.data(StateRole).toString() == "Complete" &&
+        !QFileInfo::exists(destination)) {
+        QMessageBox::warning(this, tr("Cannot move download"),
+                             tr("The downloaded file could not be found."));
+        return false;
+    }
+    auto *item = model_->item(index.row(), NameColumn);
+    item->setData(destination, PathRole);
+    const QString folder = QFileInfo(destination).dir().dirName();
+    item->setData(folder, FolderRole);
+    ensureFolderFilter(folder);
+    settings_.insert("downloadDirectory", QFileInfo(destination).absolutePath());
+    saveSettings();
+    markTransfersDirty();
+    saveTransfers();
+    applyFilters();
+    updateDetails();
+    statusBar()->showMessage(tr("Download destination updated"), 3000);
+    return true;
+}
+
 void MainWindow::startSelected()
 {
     int row = selectedRow();
@@ -1188,6 +1301,19 @@ void MainWindow::finishDownload()
     responsePrepared_ = false;
     markTransfersDirty();
     updateSummary();
+    if (movingIndex_.isValid()) {
+        const QPersistentModelIndex index = movingIndex_;
+        const QString destination = moveDestination_;
+        const bool resume = resumeAfterMove_;
+        movingIndex_ = QPersistentModelIndex();
+        moveDestination_.clear();
+        resumeAfterMove_ = false;
+        if (moveTransfer(index, destination) && resume && index.isValid()) {
+            downloads_->selectRow(index.row());
+            startSelected();
+            return;
+        }
+    }
     startNext();
 }
 
