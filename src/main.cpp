@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addVersionOption();
     QCommandLineOption themeOption(
-        "theme", "Set the preview theme: system, light, or dark.", "theme");
+        "theme", "Set and save the theme: system, light, or dark.", "theme");
     QCommandLineOption screenshotOption(
         "screenshot", "Save a window screenshot to the given path.",
         "path");

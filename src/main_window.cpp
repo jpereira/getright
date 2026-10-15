@@ -1629,13 +1629,20 @@ void MainWindow::showDataFolder()
 void MainWindow::showHelp()
 {
     QMessageBox::information(this, tr("GetRight Port Help"),
-        tr("Add adds an HTTP or HTTPS address to the download list.\n\n"
-           "Start begins or resumes the selected transfer. Pause suspends it "
-           "and keeps the partial file. Stop aborts it while keeping any "
-           "partial data. Double-click a transfer to open its progress window. "
-           "Remove deletes "
-           "the selected item from the list. Use the filters on the left "
-           "to view active, stopped, or completed downloads."));
+        tr("Add queues an HTTP or HTTPS download and asks where to save it. "
+           "Upload sends a local file to a server that accepts HTTP PUT.\n\n"
+           "Start, Pause, Stop, and Remove apply to all selected transfers. "
+           "Pause and Stop keep partial downloads. Remove keeps downloaded files on disk. "
+           "Click a single transfer to open its progress window. Use modifier-clicks "
+           "to select several rows.\n\n"
+           "The progress window offers Options, Pause/Resume, and Cancel. Cancel stops "
+           "that transfer and closes its window. Options includes a live speed graph. "
+           "View can show transfer details and toolbar labels.\n\n"
+           "Finished downloads show a tip near the tray icon with file and folder actions. "
+           "Closing the main window keeps transfers running when a tray icon is available. "
+           "Use the tray menu or Cmd+Q to quit.\n\n"
+           "Errors remain in transfer details. File > Open Data Folder opens settings "
+           "and history; unreadable JSON files show recovery instructions in the window."));
 }
 
 void MainWindow::showAbout()
@@ -1652,7 +1659,7 @@ void MainWindow::showAbout()
             "https://github.com/jpereira/getright</a></p>"
             "<p>Open source software, licensed under the GNU Lesser General "
             "Public License (LGPL), version 3.</p>"
-            "<p>A cross-platform study port inspired by GetRight 6.5.</p>")
+            "<p>An independent macOS study port inspired by GetRight 6.5.</p>")
                 .arg(QApplication::applicationVersion()));
     about.exec();
 }
