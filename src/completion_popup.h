@@ -24,4 +24,5 @@ signals:
 
 private:
     QTimer dismiss_;
+    bool keepVisible_ = false;
 };

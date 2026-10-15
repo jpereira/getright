@@ -37,6 +37,7 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
     colors.setColor(QPalette::Window, QColor(dark ? "#333326" : "#ffffe1"));
     colors.setColor(QPalette::WindowText, QColor(dark ? "#ffffe1" : "#171717"));
     colors.setColor(QPalette::ButtonText, colors.color(QPalette::WindowText));
+    colors.setColor(QPalette::Link, QColor(dark ? "#9bc6ff" : "#0055d4"));
     setPalette(colors);
 
     auto *layout = new QVBoxLayout(this);
@@ -92,18 +93,21 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
     dismiss_.start(15000);
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QWidget::customContextMenuRequested, this, [this](const QPoint &point) {
-        QMenu menu(this);
-        auto *keep = menu.addAction(tr("Keep visible"));
+        dismiss_.stop();
+        auto *menu = new QMenu(this);
+        auto *keep = menu->addAction(tr("Keep visible"));
         keep->setCheckable(true);
-        keep->setChecked(!dismiss_.isActive());
+        keep->setChecked(keepVisible_);
         connect(keep, &QAction::toggled, this, [this](bool checked) {
-            if (checked)
-                dismiss_.stop();
-            else
-                dismiss_.start(15000);
+            keepVisible_ = checked;
         });
-        menu.addAction(tr("Open GetRight"), this, &CompletionPopup::showMainRequested);
-        menu.exec(mapToGlobal(point));
+        menu->addAction(tr("Open GetRight"), this, &CompletionPopup::showMainRequested);
+        connect(menu, &QMenu::aboutToHide, this, [this, menu]() {
+            if (!keepVisible_)
+                dismiss_.start(15000);
+            menu->deleteLater();
+        });
+        menu->popup(mapToGlobal(point));
     });
     adjustSize();
     QScreen *screen = QGuiApplication::screenAt(anchor.center());

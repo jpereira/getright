@@ -36,10 +36,8 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QMessageBox>
-#include <QPainter>
 #include <QProgressBar>
 #include <QProcess>
-#include <QStyleOptionProgressBar>
 #include <QPushButton>
 #include <QSaveFile>
 #include <QStandardPaths>
@@ -47,7 +45,6 @@
 #include <QStandardItemModel>
 #include <QSplitter>
 #include <QStatusBar>
-#include <QStyledItemDelegate>
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleHints>
@@ -70,6 +67,13 @@ namespace {
 QIcon standardIcon(QWidget *widget, QStyle::StandardPixmap pixmap)
 {
     return widget->style()->standardIcon(pixmap);
+}
+
+QString formatDuration(qint64 seconds)
+{
+    seconds = qMax(qint64(0), seconds);
+    return QStringLiteral("%1:%2:%3").arg(seconds / 3600, 2, 10, QChar('0'))
+        .arg(seconds / 60 % 60, 2, 10, QChar('0')).arg(seconds % 60, 2, 10, QChar('0'));
 }
 
 void setDetailText(QLineEdit *field, const QString &text)
@@ -411,17 +415,21 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *start = toolbar->addAction(
         transferIcon("start"), tr("Start"),
         this, &MainWindow::startSelected);
+    startAction_ = start;
     start->setShortcut(Qt::Key_F5);
     QAction *pause = toolbar->addAction(
         transferIcon("pause"), tr("Pause"),
         this, &MainWindow::pauseSelected);
+    pauseAction_ = pause;
     QAction *stop = toolbar->addAction(
         transferIcon("stop"), tr("Stop"),
         this, &MainWindow::stopSelected);
+    stopAction_ = stop;
     stop->setShortcut(Qt::Key_Escape);
     QAction *remove = toolbar->addAction(
         transferIcon("remove"), tr("Remove"),
         this, &MainWindow::removeSelected);
+    removeAction_ = remove;
     remove->setShortcut(QKeySequence::Delete);
     toolbar->addSeparator();
     toolbar->addAction(transferIcon("help"),
@@ -522,6 +530,7 @@ MainWindow::MainWindow(QWidget *parent)
         urlStatus_->setText(selectedRow() >= 0
             ? model_->item(selectedRow(), UrlColumn)->text() : QString());
         updateDetails();
+        updateSummary();
     });
     connect(downloads_, &QTableView::clicked, this,
             [this](const QModelIndex &index) {
@@ -674,10 +683,9 @@ void MainWindow::updateDetails()
                    QLocale().formattedDataSize(total))
         : QLocale().formattedDataSize(received));
     detailSpeed_->setText(QLocale().formattedDataSize(speed) + tr("/s"));
-    detailElapsed_->setText(QTime(0, 0).addSecs(int(elapsed)).toString("hh:mm:ss"));
+    detailElapsed_->setText(formatDuration(elapsed));
     detailRemaining_->setText(total > 0 && speed > 0
-        ? QTime(0, 0).addSecs(int((total - received) / speed))
-              .toString("hh:mm:ss")
+        ? formatDuration((total - received) / speed)
         : tr("—"));
     detailPercent_->setText(total > 0 ? QStringLiteral("%1%").arg(percent)
                                       : tr("—"));
@@ -1155,8 +1163,7 @@ void MainWindow::updateProgress(qint64 received, qint64 total, qint64 speed)
         QLocale().formattedDataSize(speed) + tr("/s"));
     model_->item(activeRow_, RemainingColumn)->setText(
         total > received && speed > 0
-            ? QTime(0, 0).addSecs(int((total - received) / speed))
-                  .toString("hh:mm:ss")
+            ? formatDuration((total - received) / speed)
             : total >= 0 && total <= received ? tr("0:00:00") : tr("—"));
     setRowState(activeRow_, tr("Downloading"));
     markTransfersDirty();
@@ -1256,6 +1263,27 @@ void MainWindow::setRowState(int row, const QString &state)
 
 void MainWindow::updateSummary()
 {
+    const auto selected = downloads_->selectionModel()->selectedRows();
+    bool canStart = false;
+    bool canPause = false;
+    bool canStop = false;
+    for (const auto &index : selected) {
+        const QString state = model_->item(index.row(), NameColumn)->data(StateRole).toString();
+        const bool active = index.row() == activeRow_;
+        canStart |= state != "Complete" && !active;
+        canPause |= active || state == "Queued";
+        canStop |= active || state == "Queued" || state == "Paused" || state == "Failed";
+    }
+    if (selected.isEmpty()) {
+        for (int row = 0; row < model_->rowCount(); ++row)
+            canStart |= model_->item(row, NameColumn)->data(StateRole).toString() == "Queued";
+    }
+    if (startAction_) {
+        startAction_->setEnabled(canStart);
+        pauseAction_->setEnabled(canPause);
+        stopAction_->setEnabled(canStop);
+        removeAction_->setEnabled(!selected.isEmpty());
+    }
     int active = 0;
     int complete = 0;
     int uploads = 0;
@@ -1273,9 +1301,9 @@ void MainWindow::updateSummary()
         complete += state == "Complete";
         uploads += item->data(DirectionRole).toString() == "upload";
     }
-    summary_->setText(tr("%1 items   •   %2 active   •   %3 completed   •   %4 uploads")
-                          .arg(model_->rowCount()).arg(active).arg(complete)
-                          .arg(uploads));
+    summary_->setText(tr("%1 %2   •   %3 active   •   %4 completed   •   %5 uploads")
+        .arg(model_->rowCount()).arg(model_->rowCount() == 1 ? tr("item") : tr("items"))
+        .arg(active).arg(complete).arg(uploads));
     QStringList groups;
     qint64 downloadSpeed = 0;
     qint64 uploadSpeed = 0;

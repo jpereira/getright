@@ -12,6 +12,7 @@
 #include <QPersistentModelIndex>
 #include <QPointer>
 
+class QAction;
 class TransferJob;
 class QDialog;
 class QFormLayout;
@@ -92,6 +93,10 @@ private:
     QTreeWidget *folders_;
     QTableView *downloads_;
     QStandardItemModel *model_;
+    QAction *startAction_ = nullptr;
+    QAction *pauseAction_ = nullptr;
+    QAction *stopAction_ = nullptr;
+    QAction *removeAction_ = nullptr;
     QLabel *summary_;
     QLabel *storageWarning_;
     QLabel *urlStatus_;
