@@ -21,6 +21,9 @@ filters on the left, a task list, a toolbar, detailed progress, and menus.
 - Double-click a transfer to open a window with its file, address, destination,
   progress, speed, elapsed time, and estimated time remaining.
 - Details panel with URL, local destination, size, percentage, speed, and timing.
+- Window title with combined progress, total active speed, and active/total counts for
+  downloads and uploads. Progress includes all transfers, regardless of the selected filter;
+  it shows "size unknown" while any unfinished transfer has an unknown size.
 - System, Light, and Dark themes saved in user preferences.
 - Native macOS appearance or styles inspired by Windows 11 and Windows XP.
 - File, Downloads, View, and Help menus with keyboard shortcuts.

@@ -1371,6 +1371,7 @@ void MainWindow::setRowState(int row, const QString &state)
     markTransfersDirty();
     applyFilters();
     updateDetails();
+    updateSummary();
 }
 
 void MainWindow::updateSummary()
@@ -1388,6 +1389,43 @@ void MainWindow::updateSummary()
     summary_->setText(tr("%1 items   •   %2 active   •   %3 completed   •   %4 uploads")
                           .arg(model_->rowCount()).arg(active).arg(complete)
                           .arg(uploads));
+    QStringList groups;
+    for (const QString &direction : {QStringLiteral("download"), QStringLiteral("upload")}) {
+        int count = 0;
+        int running = 0;
+        qint64 received = 0;
+        qint64 total = 0;
+        qint64 speed = 0;
+        bool unknownSize = false;
+        for (int row = 0; row < model_->rowCount(); ++row) {
+            const auto *item = model_->item(row, NameColumn);
+            if (item->data(DirectionRole).toString() != direction)
+                continue;
+            ++count;
+            const QString state = item->data(StateRole).toString();
+            const bool transferring = state == "Downloading" || state == "Connecting";
+            running += transferring;
+            if (transferring)
+                speed += item->data(SpeedRole).toLongLong();
+            const qint64 size = item->data(TotalRole).toLongLong();
+            if (size > 0) {
+                total += size;
+                received += qBound(qint64(0), item->data(ReceivedRole).toLongLong(), size);
+            } else if (state != "Complete") {
+                unknownSize = true;
+            }
+        }
+        if (count == 0)
+            continue;
+        const QString progress = unknownSize || total <= 0 ? tr("size unknown")
+            : QStringLiteral("%1%").arg(qBound(0, int(100.0 * received / total), 100));
+        groups << tr("%1: %2, %3/s, %4/%5 active")
+            .arg(direction == "download" ? tr("Downloads") : tr("Uploads"), progress,
+                 QLocale().formattedDataSize(speed))
+            .arg(running).arg(count);
+    }
+    setWindowTitle(groups.isEmpty() ? tr("GetRight Port — Download Status")
+        : QStringLiteral("GetRight Port — %1").arg(groups.join(QStringLiteral(" | "))));
 }
 
 void MainWindow::markTransfersDirty()
