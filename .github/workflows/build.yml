@@ -93,6 +93,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      packages: write
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -119,3 +120,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh workflow run pages.yml --ref main
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.3
+      - name: Publish GitHub Packages
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+          REGISTRY_USER: ${{ github.actor }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "$REGISTRY_TOKEN" | oras login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          cd packages
+          oras push "$image:$RELEASE_TAG" \
+            --annotation "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "org.opencontainers.image.description=GetRight Port macOS packages" \
+            --annotation "org.opencontainers.image.licenses=LGPL-3.0-only" \
+            ./*.dmg ./*.zip ./*.tar.gz ./SHA256SUMS.txt
+          oras tag "$image:$RELEASE_TAG" latest
