@@ -280,6 +280,7 @@ MainWindow::MainWindow(QWidget *parent)
       downloads_(new QTableView(this)),
       model_(new QStandardItemModel(0, 7, this)),
       summary_(new QLabel(this)),
+      storageWarning_(new QLabel(this)),
       urlStatus_(new QLabel(this)),
       detailName_(new QLabel(this)),
       detailUrl_(new QLineEdit(this)),
@@ -423,6 +424,10 @@ MainWindow::MainWindow(QWidget *parent)
     auto *content = new QWidget(this);
     auto *contentLayout = new QVBoxLayout(content);
     contentLayout->setContentsMargins(8, 8, 8, 8);
+    storageWarning_->setWordWrap(true);
+    storageWarning_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    storageWarning_->hide();
+    contentLayout->addWidget(storageWarning_);
     contentLayout->addWidget(filter_);
     contentLayout->addWidget(downloads_, 1);
     auto *details = new QGroupBox(tr("Transfer details"), content);
@@ -503,6 +508,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(add);
     fileMenu->addAction(upload);
+    fileMenu->addAction(tr("Open Data Folder"), this, &MainWindow::showDataFolder);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("E&xit"), QKeySequence::Quit, qApp,
                         &QCoreApplication::quit);
@@ -582,6 +588,11 @@ MainWindow::MainWindow(QWidget *parent)
     });
     persistenceTimer_->start(2000);
     loadTransfers();
+    if (!settingsWritable_ || !historyWritable_)
+        showStorageWarning(tr("Some saved data could not be read. Saving is disabled for the "
+            "affected JSON files. Use File > Open Data Folder. Quit the app, keep a backup, "
+            "then repair the affected settings.json or history.json, or rename it to .broken "
+            "and reopen the app to create a new file."));
     connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
         settings_.insert("windowGeometry", QString::fromLatin1(saveGeometry().toBase64()));
         saveSettings();
@@ -1507,7 +1518,7 @@ void MainWindow::saveSettings()
     QSaveFile file(settingsFile_);
     const QByteArray data = QJsonDocument(settings_).toJson(QJsonDocument::Indented);
     if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
-        qWarning("Could not save settings to %s", qPrintable(settingsFile_));
+        showStorageWarning(tr("Settings could not be saved: %1").arg(file.errorString()));
 }
 
 void MainWindow::saveTransfers()
@@ -1570,8 +1581,7 @@ void MainWindow::saveTransfers()
     const QByteArray data = QJsonDocument(root).toJson(QJsonDocument::Indented);
     if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() ||
         !file.commit()) {
-        qWarning("Could not save transfer history to %s",
-                 qPrintable(transfersFile_));
+        showStorageWarning(tr("Transfer history could not be saved: %1").arg(file.errorString()));
         return;
     }
     transfersDirty_ = false;
@@ -1715,6 +1725,19 @@ void MainWindow::showMainWindow()
 #ifdef Q_OS_MACOS
     activateMacApplication();
 #endif
+}
+
+void MainWindow::showStorageWarning(const QString &message)
+{
+    storageWarning_->setText(message);
+    storageWarning_->show();
+}
+
+void MainWindow::showDataFolder()
+{
+    const QString directory = QFileInfo(settingsFile_).absolutePath();
+    if (!QDir().mkpath(directory) || !QDesktopServices::openUrl(QUrl::fromLocalFile(directory)))
+        QMessageBox::warning(this, tr("Cannot open data folder"), directory);
 }
 
 void MainWindow::showHelp()

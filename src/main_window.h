@@ -77,6 +77,8 @@ private:
     void markTransfersDirty();
     void ensureFolderFilter(const QString &folder);
     void showHelp();
+    void showDataFolder();
+    void showStorageWarning(const QString &message);
     void showAbout();
 
     QLineEdit *filter_;
@@ -84,6 +86,7 @@ private:
     QTableView *downloads_;
     QStandardItemModel *model_;
     QLabel *summary_;
+    QLabel *storageWarning_;
     QLabel *urlStatus_;
     QLabel *detailName_;
     QLineEdit *detailUrl_;
