@@ -1120,7 +1120,8 @@ void MainWindow::updateProgress(qint64 received, qint64 total)
 
 void MainWindow::receiveData()
 {
-    if (!activeReply_)
+    if (!activeReply_ || !activeReply_->isReadable() ||
+        !output_.isOpen() || activeRow_ < 0)
         return;
     if (model_->item(activeRow_, NameColumn)
             ->data(DirectionRole).toString() == "upload")
