@@ -1600,8 +1600,11 @@ void MainWindow::showHelp()
 
 void MainWindow::showAbout()
 {
-    QMessageBox::about(this, tr("About GetRight Port"),
-        QStringLiteral(
+    QMessageBox about(this);
+    about.setWindowTitle(tr("About GetRight Port"));
+    about.setTextFormat(Qt::RichText);
+    about.setIconPixmap(windowIcon().pixmap(96, 96));
+    about.setText(QStringLiteral(
             "<h3>GetRight Port</h3>"
             "<p><b>Author:</b> Jorge Pereira &lt;"
             "<a href=\"mailto:jpereiran@gmail.com\">jpereiran@gmail.com</a>&gt;</p>"
@@ -1610,4 +1613,5 @@ void MainWindow::showAbout()
             "<p>Open source software, licensed under the GNU Lesser General "
             "Public License (LGPL), version 3.</p>"
             "<p>A cross-platform study port inspired by GetRight 6.5.</p>"));
+    about.exec();
 }
