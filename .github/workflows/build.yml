@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# Author: Jorge Pereira <jpereiran@gmail.com>
+# Date: 2026-10-14
+# Description: Build, verify, and publish macOS packages.
+
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  macos:
+    name: macOS Apple Silicon
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: brew install qt cmake
+      - name: Check version and architecture
+        shell: bash
+        run: |
+          test "$(uname -m)" = arm64
+          version=$(tr -d '\r\n' < VERSION)
+          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "$GITHUB_REF_NAME" = "$version"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Build self-contained installer
+        run: make osx-dmg
+      - name: Check persistence and bundled plugins
+        run: |
+          python3 tests/persistence.py
+          python3 tests/bundle.py
+          codesign --verify --deep --strict build/getright-port.app
+          hdiutil verify build/getright-port-macos-arm64.dmg
+      - name: Create release packages
+        run: |
+          mkdir -p packages
+          cp build/getright-port-macos-arm64.dmg "packages/getright-port-$VERSION-macos-arm64.dmg"
+          ditto -c -k --sequesterRsrc --keepParent build/getright-port.app \
+            "packages/getright-port-$VERSION-macos-arm64.zip"
+          git archive --format=tar.gz --prefix="getright-port-$VERSION/" \
+            -o "packages/getright-port-$VERSION-source.tar.gz" HEAD
+          cd packages
+          shasum -a 256 ./*.dmg ./*.zip ./*.tar.gz > SHA256SUMS.txt
+      - name: Write release notes
+        run: |
+          qt_version=$("$(brew --prefix qt)/bin/qmake" -query QT_VERSION)
+          cat > packages/release-notes.md <<EOF
+          GetRight Port $VERSION for macOS 15 or later on Apple Silicon.
+
+          Includes a self-contained DMG, an application ZIP, source code, and SHA-256 checksums.
+          Built with Qt $qt_version, linked dynamically under LGPL v3.
+          This independent study port uses reverse engineering, REA, and AI assistance.
+
+          The app is ad-hoc signed and is not Apple-notarized.
+          Download the DMG, open it, and copy GetRight Port to Applications.
+
+          Website: https://jpereira.github.io/getright/
+          Source and build instructions: https://github.com/jpereira/getright
+          EOF
+      - uses: actions/upload-artifact@v7
+        with:
+          name: getright-port-macos-arm64
+          path: packages/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish packages
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: getright-port-macos-arm64
+          path: packages
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --title "GetRight Port $RELEASE_TAG" \
+            --notes-file packages/release-notes.md \
+            packages/*.dmg packages/*.zip packages/*.tar.gz packages/SHA256SUMS.txt
+      - name: Refresh website download list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run pages.yml --ref main

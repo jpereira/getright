@@ -96,6 +96,24 @@ This command copies the required Qt frameworks and plugins into the bundle and c
 `build/getright-port-macos-arm64.dmg`. The DMG includes dynamic Qt dependencies;
 project source code and license notices are available in this repository.
 
+## GitHub builds and releases
+
+GitHub Actions builds and tests the macOS Apple Silicon app on pushes to `main` and pull
+requests. Build artifacts include the DMG, application ZIP, source archive, and SHA-256
+checksums. The bundle includes native macOS styling and HTTPS plugins as well as Qt.
+
+To publish a release, set `VERSION` to the intended `vMAJOR.MINOR.PATCH`, commit the change,
+and push a matching tag:
+
+```sh
+git tag v1.0.1
+git push origin main v1.0.1
+```
+
+The tag build publishes packages on GitHub Releases and refreshes the website download
+list. Releases are ad-hoc signed and are not Apple-notarized. GitHub Pages publishes the
+static project site from `site/`; its package list contains assets from a published release.
+
 ## Interface and themes
 
 Use `View > Theme` to choose **System**, **Light**, or **Dark**, and
