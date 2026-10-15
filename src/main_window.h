@@ -5,7 +5,6 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QPalette>
 #include <QPersistentModelIndex>
 #include <QPointer>
 
@@ -94,7 +93,6 @@ private:
     QLabel *transferPercent_ = nullptr;
     QProgressBar *transferProgress_ = nullptr;
     QPushButton *transferPause_ = nullptr;
-    QPalette systemPalette_;
     QPersistentModelIndex transferDialogIndex_;
     QString transfersFile_;
     QString settingsFile_;

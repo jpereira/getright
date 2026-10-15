@@ -36,6 +36,7 @@
 #include <QStyledItemDelegate>
 #include <QStyle>
 #include <QStyleFactory>
+#include <QStyleHints>
 #include <QTableView>
 #include <QToolBar>
 #include <QTimer>
@@ -170,11 +171,13 @@ void MainWindow::applyTheme(const QString &theme)
     settings_.insert("theme", theme_);
     saveSettings();
     qApp->setStyleSheet({});
+    QApplication::setPalette(QPalette());
+    const Qt::ColorScheme scheme = theme_ == "light" ? Qt::ColorScheme::Light
+        : theme_ == "dark" ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown;
+    QApplication::styleHints()->setColorScheme(scheme);
     applyLookAndFeel(lookAndFeel_);
-    if (theme_ == "system") {
-        QApplication::setPalette(systemPalette_);
+    if (lookAndFeel_ == "macos" || theme_ == "system")
         return;
-    }
 
     QPalette palette;
     const auto setAllGroups = [&palette](QPalette::ColorRole role,
@@ -229,7 +232,7 @@ void MainWindow::applyLookAndFeel(const QString &lookAndFeel)
 
     const bool darkPalette = theme_ == "dark" ||
         (theme_ == "system" &&
-         systemPalette_.color(QPalette::Window).lightness() < 128);
+         QApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark);
     const QString buttonText = darkPalette ? "#f1f1f1" : "#202124";
     const QString buttonFace = darkPalette ? "#383b41" : "#f3f4f6";
     const QString buttonBorder = darkPalette ? "#676c75" : "#c7c9cc";
@@ -261,10 +264,6 @@ void MainWindow::applyLookAndFeel(const QString &lookAndFeel)
                 .arg(darkPalette ? "#f1f1f1" : "#10274c", xpTop, xpBottom,
                      darkPalette ? "#8292aa" : "#7f9db9", xpHover,
                      xpPressed));
-    } else if (theme_ == "light") {
-        // Native platform styles sometimes ignore ButtonText on toolbar buttons.
-        qApp->setStyleSheet(QStringLiteral(
-            "QPushButton, QToolButton { color: #202020; }"));
     }
 }
 
@@ -287,7 +286,6 @@ MainWindow::MainWindow(QWidget *parent)
       detailProgress_(new QProgressBar(this)),
       detailsTimer_(new QTimer(this))
 {
-    systemPalette_ = QApplication::palette();
     const QString dataDirectory = qEnvironmentVariable(
         "GETRIGHT_PORT_DATA_DIR", QDir::home().filePath(".getright"));
     settingsFile_ = QDir(dataDirectory).filePath("settings.json");
@@ -551,6 +549,11 @@ MainWindow::MainWindow(QWidget *parent)
         settings_.insert("windowGeometry", QString::fromLatin1(saveGeometry().toBase64()));
         saveSettings();
         saveTransfers();
+    });
+    connect(QApplication::styleHints(), &QStyleHints::colorSchemeChanged, this,
+            [this]() {
+        if (theme_ == "system")
+            QTimer::singleShot(0, this, [this]() { applyTheme(theme_); });
     });
     updateSummary();
     updateDetails();

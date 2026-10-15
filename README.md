@@ -48,7 +48,7 @@ segmented downloads, and browser integration are not implemented.
 
 - macOS on Apple Silicon for the current binary.
 - Xcode Command Line Tools.
-- CMake 3.21 or later and Qt 6.4 or later, with Widgets and Network.
+- CMake 3.21 or later and Qt 6.8 or later, with Widgets and Network.
 - `macdeployqt` and `hdiutil` to create the self-contained DMG.
 
 With Homebrew:
@@ -96,8 +96,8 @@ project source code and license notices are available in this repository.
 Use `View > Theme` to choose **System**, **Light**, or **Dark**, and
 `View > Look & Feel` to select macOS, Windows 11, or Windows XP. Both preferences persist
 between sessions. On macOS, the Windows styles are visual approximations built with
-Qt Fusion controls. The light theme explicitly sets button backgrounds and text colors
-to maintain contrast.
+Qt Fusion controls. The native macOS style follows the selected application color scheme;
+the Windows styles use matching palettes and button colors.
 
 Use **Pause** to suspend a download and **Start** to resume it. Double-click a row to open
 the transfer progress window. **Upload** asks for a local file and an HTTP/HTTPS destination;
