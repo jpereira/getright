@@ -45,6 +45,7 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleHints>
+#include <QSystemTrayIcon>
 #include <QTableView>
 #include <QToolBar>
 #include <QTimer>
@@ -52,6 +53,10 @@
 #include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
+
+#ifdef Q_OS_MACOS
+void activateMacApplication();
+#endif
 
 namespace {
 
@@ -317,6 +322,17 @@ MainWindow::MainWindow(QWidget *parent)
     applyTheme(theme_);
     setWindowTitle(tr("GetRight Port — Download Status"));
     setWindowIcon(QIcon(QStringLiteral(":/getright-logo.png")));
+    if (QSystemTrayIcon::isSystemTrayAvailable()) {
+        trayIcon_ = new QSystemTrayIcon(windowIcon(), this);
+        trayIcon_->setToolTip(tr("GetRight Port — Download: 0 bytes/s"));
+        connect(trayIcon_, &QSystemTrayIcon::activated, this,
+                [this](QSystemTrayIcon::ActivationReason reason) {
+            if (reason != QSystemTrayIcon::Unknown)
+                showMainWindow();
+        });
+        trayIcon_->show();
+        QApplication::setQuitOnLastWindowClosed(false);
+    }
     resize(1020, 620);
     restoreGeometry(QByteArray::fromBase64(
         settings_.value("windowGeometry").toString().toLatin1()));
@@ -478,8 +494,8 @@ MainWindow::MainWindow(QWidget *parent)
     fileMenu->addAction(add);
     fileMenu->addAction(upload);
     fileMenu->addSeparator();
-    fileMenu->addAction(tr("E&xit"), QKeySequence::Quit, this,
-                        &QWidget::close);
+    fileMenu->addAction(tr("E&xit"), QKeySequence::Quit, qApp,
+                        &QCoreApplication::quit);
     auto *downloadsMenu = menuBar()->addMenu(tr("&Downloads"));
     downloadsMenu->addAction(start);
     downloadsMenu->addAction(pause);
@@ -1397,6 +1413,8 @@ void MainWindow::updateSummary()
                           .arg(model_->rowCount()).arg(active).arg(complete)
                           .arg(uploads));
     QStringList groups;
+    qint64 downloadSpeed = 0;
+    qint64 uploadSpeed = 0;
     for (const QString &direction : {QStringLiteral("download"), QStringLiteral("upload")}) {
         int count = 0;
         int running = 0;
@@ -1422,6 +1440,10 @@ void MainWindow::updateSummary()
                 unknownSize = true;
             }
         }
+        if (direction == "download")
+            downloadSpeed = speed;
+        else
+            uploadSpeed = speed;
         if (count == 0)
             continue;
         const QString progress = unknownSize || total <= 0 ? tr("size unknown")
@@ -1433,6 +1455,13 @@ void MainWindow::updateSummary()
     }
     setWindowTitle(groups.isEmpty() ? tr("GetRight Port — Download Status")
         : QStringLiteral("GetRight Port — %1").arg(groups.join(QStringLiteral(" | "))));
+    if (trayIcon_) {
+        const QString tooltip = tr("GetRight Port\nDownload: %1/s\nUpload: %2/s\nClick to open")
+            .arg(QLocale().formattedDataSize(downloadSpeed),
+                 QLocale().formattedDataSize(uploadSpeed));
+        if (trayIcon_->toolTip() != tooltip)
+            trayIcon_->setToolTip(tooltip);
+    }
 }
 
 void MainWindow::markTransfersDirty()
@@ -1628,7 +1657,27 @@ void MainWindow::closeEvent(QCloseEvent *event)
     settings_.insert("windowGeometry", QString::fromLatin1(saveGeometry().toBase64()));
     saveSettings();
     saveTransfers();
+    if (trayIcon_ && trayIcon_->isVisible() && QSystemTrayIcon::isSystemTrayAvailable()) {
+        event->ignore();
+        if (transferDialog_)
+            transferDialog_->hide();
+        hide();
+        return;
+    }
     event->accept();
+    QCoreApplication::quit();
+}
+
+void MainWindow::showMainWindow()
+{
+    if (isMinimized())
+        setWindowState(windowState() & ~Qt::WindowMinimized);
+    show();
+    raise();
+    activateWindow();
+#ifdef Q_OS_MACOS
+    activateMacApplication();
+#endif
 }
 
 void MainWindow::showHelp()

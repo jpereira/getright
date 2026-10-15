@@ -24,6 +24,7 @@ class QStandardItemModel;
 class QTableView;
 class QTreeWidget;
 class QTimer;
+class QSystemTrayIcon;
 
 class MainWindow final : public QMainWindow
 {
@@ -34,6 +35,7 @@ public:
     void applyTheme(const QString &theme);
     void applyLookAndFeel(const QString &lookAndFeel);
     void showTransferDetails(int row);
+    void showMainWindow();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -92,6 +94,7 @@ private:
     QProgressBar *detailProgress_;
     QTimer *detailsTimer_;
     QTimer *persistenceTimer_ = nullptr;
+    QSystemTrayIcon *trayIcon_ = nullptr;
     QPointer<QDialog> transferDialog_;
     QLabel *transferName_ = nullptr;
     QLineEdit *transferUrl_ = nullptr;
