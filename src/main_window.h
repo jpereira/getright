@@ -38,7 +38,7 @@ private:
     enum Role { UrlRole = Qt::UserRole + 1, PathRole, StateRole,
                 ReceivedRole, TotalRole, RemoveWhenStoppedRole,
                 DirectionRole, AddedRole, CompletedRole, SpeedRole,
-                StartedRole, FolderRole, ElapsedRole, IdRole };
+                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole };
 
     void addDownload();
     void addUpload();
@@ -49,6 +49,7 @@ private:
     void removeSelected();
     void showTransferMenu(const QPoint &position);
     void moveSelected();
+    void downloadAgainSelected();
     bool moveTransfer(const QPersistentModelIndex &index, const QString &destination);
     void updateProgress(qint64 received, qint64 total);
     void receiveData();

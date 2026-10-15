@@ -16,7 +16,7 @@ filters on the left, a task list, a toolbar, detailed progress, and menus.
 - Local file uploads to HTTP/HTTPS destinations that accept `PUT`.
 - Start, stop, resume, remove, and monitor transfers.
 - Pause and resume downloads while preserving partial files.
-- Right-click a transfer for Start, Pause, Stop, Remove, Copy URL, and Move To.
+- Right-click a transfer for Start, Pause, Stop, Remove, Download Again, Copy URL, and Move To.
 - Move downloads to another folder, preserving partial files and resuming active transfers.
 - Double-click a transfer to open a window with its file, address, destination,
   progress, speed, elapsed time, and estimated time remaining.
@@ -107,6 +107,8 @@ the transfer progress window. Right-click a row to control the transfer or copy 
 file there. An active download pauses during the move and resumes afterward. Existing
 destination files are preserved; choose another folder if the name is already in use.
 If the move fails, an active download stays paused at its original destination.
+**Download Again** queues a completed download from the beginning, replacing the existing
+file when the new transfer starts. The restart request persists between sessions.
 
 **Upload** asks for a local file and an HTTP/HTTPS destination;
 select the task and press **Start** to send it using `PUT`.

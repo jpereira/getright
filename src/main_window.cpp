@@ -985,6 +985,8 @@ void MainWindow::showTransferMenu(const QPoint &position)
     addAction(tr("Stop"), &MainWindow::stopSelected,
               active || state == "Queued" || state == "Paused" || state == "Failed");
     addAction(tr("Remove"), &MainWindow::removeSelected);
+    addAction(tr("Download Again"), &MainWindow::downloadAgainSelected,
+              state == "Complete" && item->data(DirectionRole).toString() == "download");
     menu.addSeparator();
     QAction *copy = menu.addAction(tr("Copy URL"));
     connect(copy, &QAction::triggered, this, [index]() {
@@ -1065,6 +1067,29 @@ bool MainWindow::moveTransfer(const QPersistentModelIndex &index, const QString 
     return true;
 }
 
+void MainWindow::downloadAgainSelected()
+{
+    const int row = selectedRow();
+    if (row < 0)
+        return;
+    auto *item = model_->item(row, NameColumn);
+    if (item->data(DirectionRole).toString() != "download" ||
+        item->data(StateRole).toString() != "Complete")
+        return;
+    item->setData(true, RestartRole);
+    item->setData(qint64(0), ReceivedRole);
+    item->setData(qint64(0), SpeedRole);
+    item->setData(qint64(0), ElapsedRole);
+    item->setData(QDateTime(), StartedRole);
+    item->setData(QDateTime(), CompletedRole);
+    model_->item(row, ProgressColumn)->setText("0%");
+    model_->item(row, SpeedColumn)->setText(tr("—"));
+    model_->item(row, RemainingColumn)->setText(tr("—"));
+    setRowState(row, "Queued");
+    saveTransfers();
+    startNext();
+}
+
 void MainWindow::startSelected()
 {
     int row = selectedRow();
@@ -1083,7 +1108,8 @@ void MainWindow::startSelected()
     const QString path = nameItem->data(PathRole).toString();
     const bool uploading =
         nameItem->data(DirectionRole).toString() == "upload";
-    resumeOffset_ = !uploading && QFileInfo(path).exists()
+    const bool restart = nameItem->data(RestartRole).toBool();
+    resumeOffset_ = !uploading && !restart && QFileInfo(path).exists()
                         ? QFileInfo(path).size() : 0;
     if (uploading) {
         uploadInput_.setFileName(path);
@@ -1097,7 +1123,9 @@ void MainWindow::startSelected()
         resumeOffset_ = 0;
     } else {
         output_.setFileName(path);
-        if (!output_.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        const auto mode = QIODevice::WriteOnly |
+            (restart ? QIODevice::Truncate : QIODevice::Append);
+        if (!output_.open(mode)) {
             setRowState(row, tr("Failed"));
             QMessageBox::warning(this, tr("Cannot save file"),
                                  output_.errorString());
@@ -1106,6 +1134,7 @@ void MainWindow::startSelected()
         }
     }
 
+    nameItem->setData(false, RestartRole);
     const QUrl address(nameItem->data(UrlRole).toString());
     QNetworkRequest request(address);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -1393,7 +1422,7 @@ void MainWindow::saveTransfers()
         qint64 received = item->data(ReceivedRole).toLongLong();
         const QString path = item->data(PathRole).toString();
         if (direction == "download" && state != "Complete")
-            received = QFileInfo(path).size();
+            received = item->data(RestartRole).toBool() ? 0 : QFileInfo(path).size();
         const QDateTime started = item->data(StartedRole).toDateTime();
         const qint64 elapsed = item->data(ElapsedRole).toLongLong() +
             (started.isValid() ? started.secsTo(now) : 0);
@@ -1411,6 +1440,7 @@ void MainWindow::saveTransfers()
         transfer.insert("folder", item->data(FolderRole).toString());
         transfer.insert("direction", direction);
         transfer.insert("state", state);
+        transfer.insert("restartRequested", item->data(RestartRole).toBool());
         transfer.insert("bytesReceived", QString::number(received));
         transfer.insert("totalBytes",
                         QString::number(item->data(TotalRole).toLongLong()));
@@ -1484,7 +1514,7 @@ void MainWindow::loadTransfers()
         qint64 received = number("bytesReceived");
         const qint64 total = number("totalBytes");
         if (direction == "download" && state != "Complete")
-            received = QFileInfo(path).size();
+            received = saved.value("restartRequested").toBool() ? 0 : QFileInfo(path).size();
         const QDateTime added = dateTime("addedAt");
         const QDateTime completed = dateTime("completedAt");
         const QString folder = saved.value("folder").toString().isEmpty()
@@ -1505,6 +1535,7 @@ void MainWindow::loadTransfers()
         fileItem->setData(url, UrlRole);
         fileItem->setData(path, PathRole);
         fileItem->setData(state, StateRole);
+        fileItem->setData(saved.value("restartRequested").toBool(), RestartRole);
         fileItem->setData(direction, DirectionRole);
         fileItem->setData(folder, FolderRole);
         fileItem->setData(added.isValid() ? added : QDateTime::currentDateTime(),

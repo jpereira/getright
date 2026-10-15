@@ -73,6 +73,22 @@ class PersistenceTests(unittest.TestCase):
         self.run_app()
         self.assertEqual(self.read("history.json")["transfers"][0]["bytesReceived"], "0")
 
+    def test_pending_restart_preserves_file_and_zero_offset(self):
+        destination = self.directory / "download.bin"
+        destination.write_bytes(b"completed download")
+        transfer = {"id": "restart", "name": destination.name, "path": str(destination),
+                    "url": "https://example.invalid/download", "direction": "download",
+                    "state": "Queued", "restartRequested": True,
+                    "bytesReceived": "0", "totalBytes": "18"}
+        (self.directory / "history.json").write_text(
+            json.dumps({"transfers": [transfer]}))
+        for _ in range(2):
+            self.run_app()
+            saved = self.read("history.json")["transfers"][0]
+            self.assertTrue(saved["restartRequested"])
+            self.assertEqual(saved["bytesReceived"], "0")
+            self.assertEqual(destination.read_bytes(), b"completed download")
+
     def test_unreadable_json_is_preserved(self):
         for name in ("history.json", "settings.json"):
             (self.directory / name).write_text("{broken")
