@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# Author: Jorge Pereira <jpereiran@gmail.com>
+# Date: 2026-10-14
+# Description: Publish the project website and available release packages.
+
+name: Project website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "scripts/site-downloads.py"
+      - ".github/workflows/pages.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update available packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/site-downloads.py
+      - name: Check website
+        run: python3 tests/site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

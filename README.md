@@ -8,6 +8,9 @@ A study port of the GetRight 6.5 download manager to a cross-platform codebase.
 The interface uses Qt Widgets and preserves the classic Download Status layout:
 filters on the left, a task list, a toolbar, detailed progress, and menus.
 
+[Project website](https://jpereira.github.io/getright/) ·
+[Download packages](https://github.com/jpereira/getright/releases)
+
 ## Features
 
 - Download filters by status, folder, and common file types.
