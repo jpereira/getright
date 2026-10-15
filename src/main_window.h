@@ -46,13 +46,15 @@ private:
     enum Role { UrlRole = Qt::UserRole + 1, PathRole, StateRole,
                 ReceivedRole, TotalRole, RemoveWhenStoppedRole,
                 DirectionRole, AddedRole, CompletedRole, SpeedRole,
-                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole };
+                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole, AutoStartRole };
 
     void addDownload();
     void addUpload();
     void startSelected();
     void startNext();
     void pauseSelected();
+    void pauseAll();
+    void resumeAll();
     void stopSelected();
     void removeSelected();
     void showTransferMenu(const QPoint &position);

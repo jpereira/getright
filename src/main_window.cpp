@@ -12,6 +12,7 @@
 #include <QDateTime>
 #include <QCloseEvent>
 #include <QClipboard>
+#include <QCursor>
 #include <QDialog>
 #include <QDesktopServices>
 #include <QDir>
@@ -325,10 +326,21 @@ MainWindow::MainWindow(QWidget *parent)
     if (QSystemTrayIcon::isSystemTrayAvailable()) {
         trayIcon_ = new QSystemTrayIcon(windowIcon(), this);
         trayIcon_->setToolTip(tr("GetRight Port — Download: 0 bytes/s"));
+        auto *trayMenu = new QMenu(this);
+        trayMenu->setObjectName("trayMenu");
+        trayMenu->addAction(tr("Open"), this, &MainWindow::showMainWindow);
+        trayMenu->addAction(tr("Pause All"), this, &MainWindow::pauseAll);
+        trayMenu->addAction(tr("Resume All"), this, &MainWindow::resumeAll);
+        trayMenu->addSeparator();
+        trayMenu->addAction(tr("Close"), qApp, &QCoreApplication::quit);
         connect(trayIcon_, &QSystemTrayIcon::activated, this,
-                [this](QSystemTrayIcon::ActivationReason reason) {
+                [this, trayMenu](QSystemTrayIcon::ActivationReason reason) {
             if (reason == QSystemTrayIcon::Unknown || reason == QSystemTrayIcon::DoubleClick)
                 return;
+            if (reason == QSystemTrayIcon::Context) {
+                trayMenu->popup(QCursor::pos());
+                return;
+            }
             if (isVisible() && !isMinimized())
                 close();
             else
@@ -1166,6 +1178,7 @@ void MainWindow::startSelected()
     }
 
     nameItem->setData(false, RestartRole);
+    nameItem->setData(false, AutoStartRole);
     const QUrl address(nameItem->data(UrlRole).toString());
     QNetworkRequest request(address);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -1202,7 +1215,9 @@ void MainWindow::startNext()
                                   ->data(StateRole).toString();
         const bool upload = model_->item(row, NameColumn)
                                 ->data(DirectionRole).toString() == "upload";
-        if (state == "Queued" && !upload) {
+        const bool resumeUpload = model_->item(row, NameColumn)
+                                      ->data(AutoStartRole).toBool();
+        if (state == "Queued" && (!upload || resumeUpload)) {
             downloads_->selectRow(row);
             startSelected();
             return;
@@ -1224,6 +1239,37 @@ void MainWindow::pauseSelected()
     } else if (state == "Queued") {
         setRowState(row, tr("Paused"));
     }
+}
+
+void MainWindow::pauseAll()
+{
+    resumeAfterMove_ = false;
+    for (int row = 0; row < model_->rowCount(); ++row) {
+        auto *item = model_->item(row, NameColumn);
+        item->setData(false, AutoStartRole);
+        if (item->data(StateRole).toString() == "Queued")
+            setRowState(row, "Paused");
+    }
+    if (activeReply_) {
+        pausing_ = true;
+        activeReply_->abort();
+    }
+    saveTransfers();
+}
+
+void MainWindow::resumeAll()
+{
+    for (int row = 0; row < model_->rowCount(); ++row) {
+        auto *item = model_->item(row, NameColumn);
+        const QString state = item->data(StateRole).toString();
+        if (state == "Paused" || state == "Queued") {
+            item->setData(true, AutoStartRole);
+            if (state == "Paused")
+                setRowState(row, "Queued");
+        }
+    }
+    saveTransfers();
+    startNext();
 }
 
 void MainWindow::stopSelected()
@@ -1460,7 +1506,8 @@ void MainWindow::updateSummary()
     setWindowTitle(groups.isEmpty() ? tr("GetRight Port — Download Status")
         : QStringLiteral("GetRight Port — %1").arg(groups.join(QStringLiteral(" | "))));
     if (trayIcon_) {
-        const QString tooltip = tr("GetRight Port\nDownload: %1/s\nUpload: %2/s\nClick to open")
+        const QString tooltip =
+            tr("GetRight Port\nDownload: %1/s\nUpload: %2/s\nRight-click for actions")
             .arg(QLocale().formattedDataSize(downloadSpeed),
                  QLocale().formattedDataSize(uploadSpeed));
         if (trayIcon_->toolTip() != tooltip)

@@ -126,9 +126,14 @@ The `make screenshots` target generates a local screenshot when needed.
 ## Background transfers and menu bar icon
 
 Closing the main window hides it and keeps transfers running in the background.
-The original GetRight logo remains in the macOS menu bar. Click it with the left, right,
-or middle mouse button to hide a visible window or restore a hidden or minimized window
-and bring it forward. Hover over the icon to see the combined download and upload speeds.
+The original GetRight logo remains in the macOS menu bar. Click it with the left or middle
+mouse button to hide a visible window or restore a hidden or minimized window and bring
+it forward. Hover over the icon to see the combined download and upload speeds.
+
+Right-click the icon for **Open**, **Pause All**, **Resume All**, and **Close**.
+**Open** always displays the main window. **Pause All** pauses active and queued transfers,
+keeping partial downloads. **Resume All** schedules paused and queued downloads and uploads,
+one at a time. Stopped and failed transfers require **Start**. **Close** quits the application.
 
 Use **File > Exit** or **Cmd+Q** to quit the application and save its state.
 On desktops without a system tray, closing the window exits the application.
