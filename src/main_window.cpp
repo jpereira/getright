@@ -36,6 +36,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QProgressBar>
+#include <QProcess>
 #include <QStyleOptionProgressBar>
 #include <QPushButton>
 #include <QSaveFile>
@@ -284,6 +285,7 @@ MainWindow::MainWindow(QWidget *parent)
       detailUrl_(new QLineEdit(this)),
       detailPath_(new QLineEdit(this)),
       detailTransfer_(new QLabel(this)),
+      detailError_(new QLineEdit(this)),
       detailSpeed_(new QLabel(this)),
       detailElapsed_(new QLabel(this)),
       detailRemaining_(new QLabel(this)),
@@ -423,11 +425,11 @@ MainWindow::MainWindow(QWidget *parent)
     contentLayout->setContentsMargins(8, 8, 8, 8);
     contentLayout->addWidget(filter_);
     contentLayout->addWidget(downloads_, 1);
-    auto *details = new QGroupBox(tr("Download details"), content);
+    auto *details = new QGroupBox(tr("Transfer details"), content);
     auto *detailLayout = new QFormLayout(details);
     detailLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     detailName_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    for (QLineEdit *field : {detailUrl_, detailPath_}) {
+    for (QLineEdit *field : {detailUrl_, detailPath_, detailError_}) {
         field->setReadOnly(true);
         field->setMinimumWidth(0);
     }
@@ -445,6 +447,7 @@ MainWindow::MainWindow(QWidget *parent)
     detailLayout->addRow(tr("Address"), detailUrl_);
     detailLayout->addRow(tr("Local path"), detailPath_);
     detailLayout->addRow(tr("Transferred"), detailTransfer_);
+    detailLayout->addRow(tr("Error"), detailError_);
     detailLayout->addRow(tr("Progress"), progressLine);
     auto *stats = new QWidget(details);
     auto *statsLayout = new QHBoxLayout(stats);
@@ -561,10 +564,9 @@ MainWindow::MainWindow(QWidget *parent)
             [this]() { applyFilters(); });
     connect(downloads_->selectionModel(), &QItemSelectionModel::selectionChanged,
             this, [this]() {
-        if (selectedRow() >= 0) {
-            urlStatus_->setText(model_->item(selectedRow(), UrlColumn)->text());
-            updateDetails();
-        }
+        urlStatus_->setText(selectedRow() >= 0
+            ? model_->item(selectedRow(), UrlColumn)->text() : QString());
+        updateDetails();
     });
     connect(downloads_, &QTableView::doubleClicked, this,
             [this](const QModelIndex &index) {
@@ -678,10 +680,11 @@ void MainWindow::updateDetails()
     if (row < 0)
         row = activeRow_;
     if (row < 0 || row >= model_->rowCount()) {
-        detailName_->setText(tr("No download selected"));
+        detailName_->setText(tr("No transfer selected"));
         setDetailText(detailUrl_, {});
         setDetailText(detailPath_, {});
         detailTransfer_->clear();
+        setDetailText(detailError_, {});
         detailSpeed_->clear();
         detailElapsed_->clear();
         detailRemaining_->clear();
@@ -701,6 +704,7 @@ void MainWindow::updateDetails()
                             ? qBound(0, int(received * 100 / total), 100)
                             : 0;
     detailName_->setText(item->text());
+    setDetailText(detailError_, item->data(ErrorRole).toString());
     setDetailText(detailUrl_, item->data(UrlRole).toString());
     setDetailText(detailPath_, item->data(PathRole).toString());
     detailTransfer_->setText(total > 0
@@ -737,10 +741,11 @@ void MainWindow::showTransferDetails(int row)
         transferUrl_ = new QLineEdit(dialog);
         transferPath_ = new QLineEdit(dialog);
         transferAmount_ = new QLabel(dialog);
+        transferError_ = new QLineEdit(dialog);
         transferSpeed_ = new QLabel(dialog);
         transferElapsed_ = new QLabel(dialog);
         transferRemaining_ = new QLabel(dialog);
-        for (QLineEdit *field : {transferUrl_, transferPath_}) {
+        for (QLineEdit *field : {transferUrl_, transferPath_, transferError_}) {
             field->setReadOnly(true);
             field->setMinimumWidth(0);
         }
@@ -749,6 +754,7 @@ void MainWindow::showTransferDetails(int row)
         form->addRow(tr("Address:"), transferUrl_);
         form->addRow(tr("Save to:"), transferPath_);
         form->addRow(tr("Transferred:"), transferAmount_);
+        form->addRow(tr("Error:"), transferError_);
         layout->addLayout(form);
 
         auto *progressLine = new QWidget(dialog);
@@ -803,6 +809,7 @@ void MainWindow::showTransferDetails(int row)
             transferUrl_ = nullptr;
             transferPath_ = nullptr;
             transferAmount_ = nullptr;
+            transferError_ = nullptr;
             transferSpeed_ = nullptr;
             transferElapsed_ = nullptr;
             transferRemaining_ = nullptr;
@@ -840,6 +847,7 @@ void MainWindow::updateTransferDialog()
     transferDialog_->setWindowTitle(tr("Transfer Progress — %1")
                                         .arg(item->text()));
     transferName_->setText(item->text());
+    setDetailText(transferError_, item->data(ErrorRole).toString());
     setDetailText(transferUrl_, item->data(UrlRole).toString());
     setDetailText(transferPath_, item->data(PathRole).toString());
     transferAmount_->setText(total > 0
@@ -849,7 +857,8 @@ void MainWindow::updateTransferDialog()
         : QLocale().formattedDataSize(received));
     transferProgress_->setValue(percent);
     transferPercent_->setText(total > 0
-        ? QStringLiteral("%1% — %2").arg(percent).arg(state) : state);
+        ? QStringLiteral("%1% — %2").arg(percent).arg(
+            model_->item(row, StatusColumn)->text()) : model_->item(row, StatusColumn)->text());
     transferSpeed_->setText(QLocale().formattedDataSize(speed) + tr("/s"));
     transferElapsed_->setText(
         QTime(0, 0).addSecs(int(elapsed)).toString("hh:mm:ss"));
@@ -1024,10 +1033,30 @@ void MainWindow::showTransferMenu(const QPoint &position)
     addAction(tr("Download Again"), &MainWindow::downloadAgainSelected,
               !multiple && state == "Complete" && item->data(DirectionRole).toString() == "download");
     menu.addSeparator();
-    QAction *copy = menu.addAction(tr("Copy URL"));
-    connect(copy, &QAction::triggered, this, [index]() {
-        if (index.isValid())
-            QApplication::clipboard()->setText(index.data(UrlRole).toString());
+    QAction *copy = menu.addAction(multiple ? tr("Copy URLs") : tr("Copy URL"));
+    connect(copy, &QAction::triggered, this, [this]() {
+        QStringList urls;
+        for (const auto &selected : downloads_->selectionModel()->selectedRows())
+            urls.append(model_->item(selected.row(), NameColumn)->data(UrlRole).toString());
+        QApplication::clipboard()->setText(urls.join('\n'));
+    });
+    const QString path = item->data(PathRole).toString();
+    const bool completedFile = !multiple && state == "Complete" && QFileInfo(path).isFile();
+    QAction *open = menu.addAction(tr("Open File"));
+    open->setEnabled(completedFile);
+    connect(open, &QAction::triggered, this, [this, path]() {
+        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+            QMessageBox::warning(this, tr("Cannot open file"), tr("No application opened the file."));
+    });
+    QAction *reveal = menu.addAction(tr("Show in Finder"));
+    reveal->setEnabled(!multiple && QFileInfo::exists(path));
+    connect(reveal, &QAction::triggered, this, [this, path]() {
+#ifdef Q_OS_MACOS
+        if (!QProcess::startDetached("/usr/bin/open", {"-R", path}))
+            QMessageBox::warning(this, tr("Cannot reveal file"), tr("Finder could not be opened."));
+#else
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+#endif
     });
     addAction(tr("Move To"), &MainWindow::moveSelected,
               !multiple && item->data(DirectionRole).toString() == "download" &&
@@ -1347,7 +1376,8 @@ void MainWindow::finishDownload(const QString &error)
         setRowState(row, tr("Stopped"));
     } else {
         setRowState(row, tr("Complete"));
-        statusBar()->showMessage(tr("Download complete"), 5000);
+        statusBar()->showMessage(transfer->data(DirectionRole).toString() == "upload"
+            ? tr("Upload complete") : tr("Download complete"), 5000);
     }
     stopping_ = false;
     pausing_ = false;
@@ -1377,7 +1407,9 @@ void MainWindow::setRowState(int row, const QString &state)
     item->setData(state, StateRole);
     if (state == tr("Complete"))
         item->setData(QDateTime::currentDateTime(), CompletedRole);
-    model_->item(row, StatusColumn)->setText(state);
+    model_->item(row, StatusColumn)->setText(state == "Downloading" &&
+        item->data(DirectionRole).toString() == "upload" ? tr("Uploading") : state);
+    model_->item(row, StatusColumn)->setToolTip(item->data(ErrorRole).toString());
     const QIcon icon = state == tr("Complete")
                            ? standardIcon(this, QStyle::SP_DialogApplyButton)
                            : state == tr("Downloading") || state == tr("Connecting")
@@ -1633,12 +1665,14 @@ void MainWindow::loadTransfers()
         items << fileItem
               << new QStandardItem(total > 0
                     ? QLocale().formattedDataSize(total) : tr("Unknown"))
-              << new QStandardItem(state)
+              << new QStandardItem(state == "Downloading" && direction == "upload"
+                    ? tr("Uploading") : state)
               << new QStandardItem(total > 0
                     ? QStringLiteral("%1%").arg(percent) : QString())
               << new QStandardItem(tr("—"))
               << new QStandardItem(tr("—"))
               << new QStandardItem(url);
+        items[StatusColumn]->setToolTip(saved.value("error").toString());
         model_->appendRow(items);
         if (direction == "download")
             ensureFolderFilter(folder);

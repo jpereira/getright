@@ -89,6 +89,7 @@ private:
     QLineEdit *detailUrl_;
     QLineEdit *detailPath_;
     QLabel *detailTransfer_;
+    QLineEdit *detailError_;
     QLabel *detailSpeed_;
     QLabel *detailElapsed_;
     QLabel *detailRemaining_;
@@ -102,6 +103,7 @@ private:
     QLineEdit *transferUrl_ = nullptr;
     QLineEdit *transferPath_ = nullptr;
     QLabel *transferAmount_ = nullptr;
+    QLineEdit *transferError_ = nullptr;
     QLabel *transferSpeed_ = nullptr;
     QLabel *transferElapsed_ = nullptr;
     QLabel *transferRemaining_ = nullptr;
