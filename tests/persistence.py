@@ -14,9 +14,10 @@ import tempfile
 import unittest
 
 
-APP = Path(__file__).resolve().parents[1] / (
-    "build/getright-port.app/Contents/MacOS/getright-port"
-)
+APP = Path(os.environ.get(
+    "GETRIGHT_APP_EXECUTABLE",
+    Path(__file__).resolve().parents[1] / "build/getright-port.app/Contents/MacOS/getright-port",
+))
 
 
 class PersistenceTests(unittest.TestCase):

@@ -51,7 +51,7 @@ segmented downloads, and browser integration are not implemented.
 
 ## Requirements
 
-- macOS on Apple Silicon for the current binary.
+- macOS 15 or later on Apple Silicon for release packages.
 - Xcode Command Line Tools.
 - CMake 3.21 or later and Qt 6.8 or later, with Widgets and Network.
 - `macdeployqt` and `hdiutil` to create the self-contained DMG.
