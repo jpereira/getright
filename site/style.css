@@ -64,7 +64,7 @@ h1 em, h2 em { font-family: var(--serif); font-weight: 400; }
 .orbit-two { width: 80%; height: 117%; top: -9%; left: 15%; transform: rotate(22deg); }
 .hero-visual::before { content: ""; position: absolute; width: 84%; height: 84%;
   background: #e5edce; border-radius: 50%; left: 10%; top: 6%; z-index: -2; }
-.app-frame { margin: 0; overflow: hidden; background: white; border: 1px solid #b4bbae;
+.app-frame { margin: 0; overflow: hidden; background: white; border: 1px solid #7b8875;
   border-radius: 8px; box-shadow: 0 24px 50px #1b332524; }
 .hero-app { transform: rotate(-2deg); position: relative; }
 .frame-bar { display: flex; align-items: center; justify-content: space-between; gap: 7px;
@@ -132,7 +132,8 @@ h2 { font-size: clamp(35px, 3.5vw, 50px); line-height: 1.14; letter-spacing: -1.
 .gallery { margin: 0; padding: 36px 60px 0; background: #e4e8dc;
   border: 1px solid #d3d8c9; border-radius: 5px; }
 .gallery a { display: block; min-width: 0; }
-.gallery img { width: 100%; max-height: 650px; aspect-ratio: 1140 / 730; object-fit: contain;
+.gallery img { margin-inline: auto; }
+.gallery img { width: 100%; max-height: 650px; aspect-ratio: 980 / 600; object-fit: contain;
   object-position: center; filter: drop-shadow(0 10px 20px #1c302322); }
 .gallery figcaption { display: flex; justify-content: space-between; gap: 20px; padding-block: 22px;
   font-size: 10px; color: #5b6e51; }

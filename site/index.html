@@ -56,7 +56,7 @@
             <span class="window-dots"><i></i><i></i><i></i></span>
             <span>GetRight Port · macOS</span><span class="frame-live">LIVE TRANSFER</span>
           </div>
-          <img src="assets/port-light.png" alt="GetRight Port downloading a source archive on macOS in its native light appearance" width="1140" height="730" fetchpriority="high">
+          <img src="assets/port-light.png" alt="GetRight Port downloading a source archive on macOS in its native light appearance" width="980" height="600" fetchpriority="high">
         </figure>
         <div class="time-ticket"><span class="ticket-arrow">↳</span>
           <div><strong>Same little icon.</strong><span>A different era.</span></div>
@@ -126,22 +126,28 @@
           Native macOS controls, your choice of light or dark, and the details that matter.</p>
       </div>
       <div class="gallery-tabs" role="group" aria-label="Choose an application screenshot">
-        <button type="button" class="selected" data-view="light" aria-pressed="true">macOS · Light</button>
+        <button type="button" class="selected" data-view="download" aria-pressed="true">Live download</button>
+        <button type="button" data-view="light" aria-pressed="false">macOS · Light</button>
         <button type="button" data-view="dark" aria-pressed="false">macOS · Dark</button>
+        <button type="button" data-view="classic" aria-pressed="false">Classic style</button>
         <button type="button" data-view="progress" aria-pressed="false">Download details</button>
+        <button type="button" data-view="finished" aria-pressed="false">Download finished</button>
       </div>
       <figure class="gallery">
-        <a id="gallery-link" href="assets/port-light.png" target="_blank" rel="noopener">
-          <img id="gallery-image" src="assets/port-light.png" alt="GetRight Port in the native macOS light appearance, downloading a source archive" width="1140" height="730" loading="lazy">
+        <a id="gallery-link" href="assets/port-download.gif" target="_blank" rel="noopener">
+          <picture>
+            <source id="gallery-static" media="(prefers-reduced-motion: reduce)" srcset="assets/port-progress.png">
+            <img id="gallery-image" src="assets/port-download.gif" alt="A real GetRight download advancing from start to finish with a live progress bar" width="470" height="205" style="max-width:470px;aspect-ratio:470 / 205" loading="lazy">
+          </picture>
         </a>
-        <figcaption><span id="gallery-caption">Native macOS, light theme. Click the image to see it full size.</span>
-          <span class="gallery-counter" id="gallery-counter">01 / 03</span></figcaption>
+        <figcaption><span id="gallery-caption">A real HTTP download, from start to finish. The animation loops.</span>
+          <span class="gallery-counter" id="gallery-counter">01 / 06</span></figcaption>
       </figure>
       <div class="feature-list">
         <div><span>01</span><h3>Pick up where you paused.</h3>
           <p>HTTP/HTTPS downloads, partial files, pause and resume, and a persistent queue.</p></div>
         <div><span>02</span><h3>Keep the details in sight.</h3>
-          <p>Progress, speed, remaining time, destination, and history. One double-click away.</p></div>
+          <p>Progress, speed, remaining time, destination, and history. One click away.</p></div>
         <div><span>03</span><h3>Let it work in the background.</h3>
           <p>A familiar menu bar icon, live speeds, and controls to pause or resume all transfers.</p></div>
         <div><span>04</span><h3>Make it feel like yours.</h3>

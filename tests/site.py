@@ -56,7 +56,8 @@ class WebsiteTests(unittest.TestCase):
         self.assertGreaterEqual(len(self.page.images), 5)
         for image in self.page.images:
             self.assertIn("alt", image)
-        for name in ("port-light.png", "port-dark.png", "port-progress.png"):
+        for name in ("port-light.png", "port-dark.png", "port-classic.png",
+                     "port-progress.png", "port-finished.png", "port-download.gif"):
             self.assertTrue((ROOT / "assets" / name).is_file(), name)
         readme = (ROOT.parent / "README.md").read_text()
         self.assertLess(readme.index("site/assets/port-light.png"), readme.index("## Features"))
