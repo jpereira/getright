@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="getright-logo.png">getright-logo.png</file>
+    </qresource>
+</RCC>
