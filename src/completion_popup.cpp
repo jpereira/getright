@@ -24,6 +24,9 @@ CompletionPopup::CompletionPopup(const QString &name, qint64 elapsed, qint64 byt
 {
     setObjectName("completionPopup");
     setAttribute(Qt::WA_ShowWithoutActivating);
+#ifdef Q_OS_MACOS
+    setAttribute(Qt::WA_MacAlwaysShowToolWindow);
+#endif
     setAttribute(Qt::WA_DeleteOnClose);
     setFrameStyle(QFrame::Box | QFrame::Plain);
     QFont tipFont = font();
