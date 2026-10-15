@@ -11,9 +11,7 @@ filters on the left, a task list, a toolbar, detailed progress, and menus.
 [Project website](https://jpereira.github.io/getright/) ·
 [Download packages](https://github.com/jpereira/getright/releases)
 
-![GetRight Port running on macOS with the native light appearance](site/assets/port-light.png)
-
-![A real GetRight download with an advancing progress bar](site/assets/port-download.gif)
+![GetRight Port on macOS with a real download advancing in its progress window](site/assets/port-window-download.gif)
 
 ## Features
 
@@ -75,7 +73,14 @@ segmented downloads, and browser integration are not implemented.
 
 Release packages require macOS 15 or later on Apple Silicon. Open the DMG and copy the app
 to Applications, or extract the application ZIP. Packages include Qt and its runtime dependencies.
-The app is ad-hoc signed and is not Apple-notarized.
+The app is ad-hoc signed and is not Apple-notarized, so macOS may refuse to open it. After
+copying it to Applications, remove the quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/GetRight Port.app"
+```
+
+Or open System Settings > Privacy & Security and click Open Anyway.
 
 ## Build requirements
 
@@ -96,10 +101,10 @@ From the repository root:
 ```sh
 make          # Show help without building
 make osx      # Build the arm64 bundle
-open build/getright-port.app
+open "build/GetRight Port.app"
 ```
 
-The executable is at `build/getright-port.app/Contents/MacOS/getright-port`.
+The executable is at `build/GetRight Port.app/Contents/MacOS/GetRight Port`.
 To use another build directory or Qt prefix:
 
 ```sh
@@ -125,7 +130,7 @@ make osx-dmg
 
 This command copies the required Qt frameworks and plugins into the bundle and creates
 `build/getright-port-macos-arm64.dmg`. The packaged app is staged separately at
-`build/package/getright-port.app`; the development bundle stays linked to the local Qt install.
+`build/package/GetRight Port.app`; the development bundle stays linked to the local Qt install.
 The DMG includes dynamic Qt dependencies;
 project source code and license notices are available in this repository.
 

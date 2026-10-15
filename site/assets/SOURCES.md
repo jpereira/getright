@@ -16,6 +16,7 @@
   The capture tool draws a one-pixel black outline around every image for white documentation
   backgrounds.
 
+- `port-window-download.gif`: `port-download.gif` composited over the `port-light.png` main window.
 - `port-download.gif`: a looping recording of a real local HTTP download from start to finish.
   Frames come from the same compiled application and are encoded with ffmpeg. The website
   displays a still capture when the viewer prefers reduced motion.

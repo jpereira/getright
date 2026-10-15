@@ -58,6 +58,7 @@ if(APPLE)
 endif()
 
 set_target_properties(getright-port PROPERTIES
+    OUTPUT_NAME "GetRight Port"
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_GUI_IDENTIFIER org.personal.getright-port
     MACOSX_BUNDLE_BUNDLE_NAME "GetRight Port"

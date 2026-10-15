@@ -8,10 +8,10 @@
 .PHONY: help osx osx-dmg screenshots clean
 
 BUILD_DIR ?= build
-APP_NAME := getright-port
+APP_NAME := GetRight Port
 APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
 PACKAGE_BUNDLE := $(BUILD_DIR)/package/$(APP_NAME).app
-DMG_PATH := $(BUILD_DIR)/$(APP_NAME)-macos-arm64.dmg
+DMG_PATH := $(BUILD_DIR)/getright-port-macos-arm64.dmg
 MACOS_DEPLOYMENT_TARGET ?= 15.0
 QT_PREFIX ?= $(shell brew --prefix qt 2>/dev/null)
 QT_PLUGIN_DIR ?= $(shell "$(QT_PREFIX)/bin/qtpaths" --query QT_INSTALL_PLUGINS)
@@ -75,6 +75,9 @@ screenshots: osx
 	ffmpeg -y -loglevel error -framerate 10 -i "$(BUILD_DIR)/gif-frames/frame-%04d.png" \
 	  -filter_complex 'split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer' \
 	  -loop 0 site/assets/port-download.gif
+	ffmpeg -y -loglevel error -loop 1 -i site/assets/port-light.png -i site/assets/port-download.gif \
+	  -filter_complex '[0][1]overlay=255:190:shortest=1,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=none' \
+	  site/assets/port-window-download.gif
 
 clean:
 	rm -rf "$(BUILD_DIR)"

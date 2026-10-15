@@ -16,7 +16,7 @@ import unittest
 
 APP = Path(os.environ.get(
     "GETRIGHT_APP_EXECUTABLE",
-    Path(__file__).resolve().parents[1] / "build/getright-port.app/Contents/MacOS/getright-port",
+    Path(__file__).resolve().parents[1] / "build/GetRight Port.app/Contents/MacOS/GetRight Port",
 ))
 
 

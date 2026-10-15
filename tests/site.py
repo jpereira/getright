@@ -57,10 +57,11 @@ class WebsiteTests(unittest.TestCase):
         for image in self.page.images:
             self.assertIn("alt", image)
         for name in ("port-light.png", "port-dark.png", "port-classic.png",
-                     "port-progress.png", "port-finished.png", "port-download.gif"):
+                     "port-progress.png", "port-finished.png", "port-download.gif",
+                     "port-window-download.gif"):
             self.assertTrue((ROOT / "assets" / name).is_file(), name)
         readme = (ROOT.parent / "README.md").read_text()
-        self.assertLess(readme.index("site/assets/port-light.png"), readme.index("## Features"))
+        self.assertLess(readme.index("site/assets/port-window-download.gif"), readme.index("## Features"))
 
     def test_release_downloads_point_to_published_assets(self):
         manifest = json.loads((ROOT / "downloads.json").read_text())
