@@ -472,6 +472,7 @@ MainWindow::MainWindow(QWidget *parent)
     toolbar->addSeparator();
     toolbar->addAction(coloredIcon("help"),
                        tr("Help"), this, &MainWindow::showHelp);
+    toolbar->addAction(windowIcon(), tr("About"), this, &MainWindow::showAbout);
 
     auto *fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(add);
