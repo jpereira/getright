@@ -42,6 +42,7 @@ jobs:
         run: make osx-dmg
       - name: Check persistence and bundled plugins
         run: |
+          ctest --test-dir build --output-on-failure
           python3 tests/persistence.py
           python3 tests/bundle.py
           codesign --verify --deep --strict build/getright-port.app

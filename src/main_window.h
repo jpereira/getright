@@ -9,11 +9,10 @@
 #include <QFile>
 #include <QMainWindow>
 #include <QJsonObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
 #include <QPersistentModelIndex>
 #include <QPointer>
 
+class TransferJob;
 class QDialog;
 class QCloseEvent;
 class QLabel;
@@ -46,7 +45,7 @@ private:
     enum Role { UrlRole = Qt::UserRole + 1, PathRole, StateRole,
                 ReceivedRole, TotalRole, RemoveWhenStoppedRole,
                 DirectionRole, AddedRole, CompletedRole, SpeedRole,
-                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole, AutoStartRole };
+                StartedRole, FolderRole, ElapsedRole, IdRole, RestartRole, AutoStartRole, EtagRole, ModifiedRole, ErrorRole };
 
     void addDownload();
     void addUpload();
@@ -61,9 +60,8 @@ private:
     void moveSelected();
     void downloadAgainSelected();
     bool moveTransfer(const QPersistentModelIndex &index, const QString &destination);
-    void updateProgress(qint64 received, qint64 total);
-    void receiveData();
-    void finishDownload();
+    void updateProgress(qint64 received, qint64 total, qint64 speed);
+    void finishDownload(const QString &error);
     void setRowState(int row, const QString &state);
     int selectedRow() const;
     void updateSummary();
@@ -78,7 +76,6 @@ private:
     void showHelp();
     void showAbout();
 
-    QNetworkAccessManager network_;
     QLineEdit *filter_;
     QTreeWidget *folders_;
     QTableView *downloads_;
@@ -117,12 +114,8 @@ private:
     QJsonObject settings_;
     bool settingsWritable_ = true;
     bool historyWritable_ = true;
-    QNetworkReply *activeReply_ = nullptr;
-    QFile output_;
-    QFile uploadInput_;
+    TransferJob *activeJob_ = nullptr;
     int activeRow_ = -1;
-    qint64 resumeOffset_ = 0;
-    bool responsePrepared_ = false;
     bool stopping_ = false;
     bool pausing_ = false;
     bool transfersDirty_ = false;

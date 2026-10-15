@@ -34,6 +34,8 @@ qt_add_executable(getright-port
     src/main.cpp
     src/main_window.cpp
     src/main_window.h
+    src/transfer_job.cpp
+    src/transfer_job.h
     resources/getright.qrc
     "${APP_ICON}"
 )
@@ -59,3 +61,12 @@ set_target_properties(getright-port PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_ICON_FILE "GetRightPort.icns"
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    qt_add_executable(transfer-tests tests/transfer_job.cpp src/transfer_job.cpp)
+    target_include_directories(transfer-tests PRIVATE src)
+    target_link_libraries(transfer-tests PRIVATE Qt6::Network Qt6::Test)
+    add_test(NAME transfers COMMAND transfer-tests)
+endif()

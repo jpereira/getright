@@ -5,6 +5,7 @@
 // Description: Transfer management, persistence, and user interface.
 
 #include "main_window.h"
+#include "transfer_job.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -925,6 +926,7 @@ void MainWindow::addDownload()
     fileItem->setData(QUuid::createUuid().toString(QUuid::WithoutBraces),
                       IdRole);
     fileItem->setData(path, PathRole);
+    fileItem->setData(true, RestartRole);
     fileItem->setData(QStringLiteral("Queued"), StateRole);
     fileItem->setData(QStringLiteral("download"), DirectionRole);
     const QString folder = QFileInfo(path).dir().dirName();
@@ -1009,7 +1011,7 @@ void MainWindow::showTransferMenu(const QPoint &position)
     downloads_->selectRow(index.row());
     const auto *item = model_->item(index.row(), NameColumn);
     const QString state = item->data(StateRole).toString();
-    const bool active = activeReply_ && index.row() == activeRow_;
+    const bool active = activeJob_ && index.row() == activeRow_;
 
     QMenu menu(this);
     const auto addAction = [&](const QString &text, auto operation, bool enabled = true) {
@@ -1023,7 +1025,7 @@ void MainWindow::showTransferMenu(const QPoint &position)
         });
     };
     addAction(tr("Start"), &MainWindow::startSelected,
-              !activeReply_ && state != "Complete");
+              !activeJob_ && state != "Complete");
     addAction(tr("Pause"), &MainWindow::pauseSelected, active || state == "Queued");
     addAction(tr("Stop"), &MainWindow::stopSelected,
               active || state == "Queued" || state == "Paused" || state == "Failed");
@@ -1063,12 +1065,12 @@ void MainWindow::moveSelected()
         return;
     }
 
-    if (activeReply_ && index.row() == activeRow_) {
+    if (activeJob_ && index.row() == activeRow_) {
         movingIndex_ = index;
         moveDestination_ = destination;
         resumeAfterMove_ = true;
         pausing_ = true;
-        activeReply_->abort();
+        activeJob_->cancel();
     } else {
         moveTransfer(index, destination);
     }
@@ -1143,72 +1145,42 @@ void MainWindow::startSelected()
     const QString state = model_->item(row, NameColumn)->data(StateRole).toString();
     if (state == "Complete" || state == "Downloading")
         return;
-    if (activeReply_)
+    if (activeJob_)
         return;
 
     activeRow_ = row;
-    auto *nameItem = model_->item(row, NameColumn);
-    const QString path = nameItem->data(PathRole).toString();
-    const bool uploading =
-        nameItem->data(DirectionRole).toString() == "upload";
-    const bool restart = nameItem->data(RestartRole).toBool();
-    resumeOffset_ = !uploading && !restart && QFileInfo(path).exists()
-                        ? QFileInfo(path).size() : 0;
-    if (uploading) {
-        uploadInput_.setFileName(path);
-        if (!uploadInput_.open(QIODevice::ReadOnly)) {
-            setRowState(row, tr("Failed"));
-            QMessageBox::warning(this, tr("Cannot read upload file"),
-                                 uploadInput_.errorString());
-            activeRow_ = -1;
-            return;
-        }
-        resumeOffset_ = 0;
-    } else {
-        output_.setFileName(path);
-        const auto mode = QIODevice::WriteOnly |
-            (restart ? QIODevice::Truncate : QIODevice::Append);
-        if (!output_.open(mode)) {
-            setRowState(row, tr("Failed"));
-            QMessageBox::warning(this, tr("Cannot save file"),
-                                 output_.errorString());
-            activeRow_ = -1;
-            return;
-        }
-    }
-
-    nameItem->setData(false, RestartRole);
-    nameItem->setData(false, AutoStartRole);
-    const QUrl address(nameItem->data(UrlRole).toString());
-    QNetworkRequest request(address);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
-    if (resumeOffset_ > 0)
-        request.setRawHeader("Range", QByteArray("bytes=") +
-                                            QByteArray::number(resumeOffset_) + "-");
-    responsePrepared_ = false;
+    auto *item = model_->item(row, NameColumn);
+    TransferJob::Request request;
+    request.url = QUrl(item->data(UrlRole).toString());
+    request.path = item->data(PathRole).toString();
+    request.upload = item->data(DirectionRole).toString() == "upload";
+    request.restart = item->data(RestartRole).toBool();
+    request.etag = item->data(EtagRole).toByteArray();
+    request.lastModified = item->data(ModifiedRole).toByteArray();
+    item->setData(false, AutoStartRole);
+    item->setData(QString(), ErrorRole);
+    item->setData(QDateTime::currentDateTime(), StartedRole);
+    item->setData(qint64(0), SpeedRole);
     stopping_ = false;
-    nameItem->setData(QDateTime::currentDateTime(), StartedRole);
-    nameItem->setData(qint64(0), SpeedRole);
-    activeReply_ = uploading ? network_.put(request, &uploadInput_)
-                             : network_.get(request);
-    setRowState(row, tr("Connecting"));
-    if (uploading) {
-        connect(activeReply_, &QNetworkReply::uploadProgress, this,
-                &MainWindow::updateProgress);
-    } else {
-        connect(activeReply_, &QNetworkReply::downloadProgress, this,
-                &MainWindow::updateProgress);
-        connect(activeReply_, &QIODevice::readyRead, this,
-                &MainWindow::receiveData);
-    }
-    connect(activeReply_, &QNetworkReply::finished, this,
-            &MainWindow::finishDownload);
+    pausing_ = false;
+    activeJob_ = new TransferJob(this);
+    connect(activeJob_, &TransferJob::progress, this, &MainWindow::updateProgress);
+    connect(activeJob_, &TransferJob::validators, this,
+            [this](const QByteArray &etag, const QByteArray &modified) {
+        auto *transfer = model_->item(activeRow_, NameColumn);
+        transfer->setData(etag, EtagRole);
+        transfer->setData(modified, ModifiedRole);
+        transfer->setData(false, RestartRole);
+        saveTransfers();
+    });
+    connect(activeJob_, &TransferJob::finished, this, &MainWindow::finishDownload);
+    setRowState(row, "Connecting");
+    activeJob_->start(request);
 }
 
 void MainWindow::startNext()
 {
-    if (activeReply_)
+    if (activeJob_)
         return;
     for (int row = 0; row < model_->rowCount(); ++row) {
         const QString state = model_->item(row, NameColumn)
@@ -1232,10 +1204,10 @@ void MainWindow::pauseSelected()
         return;
     const QString state = model_->item(row, NameColumn)
                               ->data(StateRole).toString();
-    if (row == activeRow_ && activeReply_ &&
+    if (row == activeRow_ && activeJob_ &&
         (state == "Downloading" || state == "Connecting")) {
         pausing_ = true;
-        activeReply_->abort();
+        activeJob_->cancel();
     } else if (state == "Queued") {
         setRowState(row, tr("Paused"));
     }
@@ -1250,9 +1222,9 @@ void MainWindow::pauseAll()
         if (item->data(StateRole).toString() == "Queued")
             setRowState(row, "Paused");
     }
-    if (activeReply_) {
+    if (activeJob_) {
         pausing_ = true;
-        activeReply_->abort();
+        activeJob_->cancel();
     }
     saveTransfers();
 }
@@ -1277,9 +1249,9 @@ void MainWindow::stopSelected()
     const int row = selectedRow();
     if (row < 0)
         return;
-    if (activeReply_ && row == activeRow_) {
+    if (activeJob_ && row == activeRow_) {
         stopping_ = true;
-        activeReply_->abort();
+        activeJob_->cancel();
         return;
     }
     const QString state = model_->item(row, NameColumn)->data(StateRole).toString();
@@ -1292,13 +1264,13 @@ void MainWindow::removeSelected()
     const QModelIndexList selected = downloads_->selectionModel()->selectedRows();
     for (auto it = selected.crbegin(); it != selected.crend(); ++it) {
         const int row = it->row();
-        if (activeReply_ && row == activeRow_) {
+        if (activeJob_ && row == activeRow_) {
             model_->item(row, NameColumn)->setData(true, RemoveWhenStoppedRole);
             stopping_ = true;
-            activeReply_->abort();
+            activeJob_->cancel();
         } else {
             model_->removeRow(row);
-            if (activeReply_ && row < activeRow_)
+            if (activeJob_ && row < activeRow_)
                 --activeRow_;
         }
     }
@@ -1306,24 +1278,13 @@ void MainWindow::removeSelected()
     markTransfersDirty();
 }
 
-void MainWindow::updateProgress(qint64 received, qint64 total)
+void MainWindow::updateProgress(qint64 received, qint64 total, qint64 speed)
 {
     if (activeRow_ < 0)
         return;
     auto *nameItem = model_->item(activeRow_, NameColumn);
-    const bool uploading =
-        nameItem->data(DirectionRole).toString() == "upload";
-    if (!uploading) {
-        received += resumeOffset_;
-        total += resumeOffset_;
-    }
     nameItem->setData(received, ReceivedRole);
     nameItem->setData(total, TotalRole);
-    const QDateTime started = nameItem->data(StartedRole).toDateTime();
-    const qint64 seconds = qMax<qint64>(1,
-        nameItem->data(ElapsedRole).toLongLong() +
-        started.secsTo(QDateTime::currentDateTime()));
-    const qint64 speed = received / seconds;
     nameItem->setData(speed, SpeedRole);
     model_->item(activeRow_, SizeColumn)->setText(
         total > 0 ? QLocale().formattedDataSize(total) : tr("Unknown"));
@@ -1340,42 +1301,13 @@ void MainWindow::updateProgress(qint64 received, qint64 total)
     updateSummary();
 }
 
-void MainWindow::receiveData()
+void MainWindow::finishDownload(const QString &error)
 {
-    if (!activeReply_ || !activeReply_->isReadable() ||
-        !output_.isOpen() || activeRow_ < 0)
+    if (!activeJob_)
         return;
-    if (model_->item(activeRow_, NameColumn)
-            ->data(DirectionRole).toString() == "upload")
-        return;
-    if (!responsePrepared_) {
-        responsePrepared_ = true;
-        const int code = activeReply_->attribute(
-            QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (resumeOffset_ > 0 && code != 206) {
-            output_.resize(0);
-            resumeOffset_ = 0;
-            auto *nameItem = model_->item(activeRow_, NameColumn);
-            nameItem->setData(qint64(0), ReceivedRole);
-        }
-        setRowState(activeRow_, tr("Downloading"));
-    }
-    output_.write(activeReply_->readAll());
-}
-
-void MainWindow::finishDownload()
-{
-    if (!activeReply_)
-        return;
-    receiveData();
     const int row = activeRow_;
     const bool removed = model_->item(row, NameColumn)
                              ->data(RemoveWhenStoppedRole).toBool();
-    const auto error = activeReply_->error();
-    const QString errorText = activeReply_->errorString();
-    output_.flush();
-    output_.close();
-    uploadInput_.close();
     auto *transfer = model_->item(row, NameColumn);
     const QDateTime started = transfer->data(StartedRole).toDateTime();
     if (started.isValid()) {
@@ -1385,26 +1317,26 @@ void MainWindow::finishDownload()
             ElapsedRole);
         transfer->setData(QDateTime(), StartedRole);
     }
-    activeReply_->deleteLater();
-    activeReply_ = nullptr;
+    activeJob_->deleteLater();
+    activeJob_ = nullptr;
     activeRow_ = -1;
 
     if (removed) {
         model_->removeRow(row);
+    } else if (!error.isEmpty()) {
+        transfer->setData(error, ErrorRole);
+        setRowState(row, "Failed");
+        statusBar()->showMessage(error, 8000);
     } else if (pausing_) {
         setRowState(row, tr("Paused"));
-    } else if (stopping_ || error == QNetworkReply::OperationCanceledError) {
+    } else if (stopping_) {
         setRowState(row, tr("Stopped"));
-    } else if (error == QNetworkReply::NoError) {
+    } else {
         setRowState(row, tr("Complete"));
         statusBar()->showMessage(tr("Download complete"), 5000);
-    } else {
-        setRowState(row, tr("Failed"));
-        statusBar()->showMessage(errorText, 8000);
     }
     stopping_ = false;
     pausing_ = false;
-    responsePrepared_ = false;
     markTransfersDirty();
     updateSummary();
     if (movingIndex_.isValid()) {
@@ -1536,8 +1468,8 @@ void MainWindow::saveTransfers()
 {
     if (!historyWritable_)
         return;
-    if (output_.isOpen())
-        output_.flush();
+    if (activeJob_)
+        activeJob_->flush();
     QDir().mkpath(QFileInfo(transfersFile_).absolutePath());
     QJsonArray transfers;
     const QDateTime now = QDateTime::currentDateTime();
@@ -1569,6 +1501,9 @@ void MainWindow::saveTransfers()
         transfer.insert("folder", item->data(FolderRole).toString());
         transfer.insert("direction", direction);
         transfer.insert("state", state);
+        transfer.insert("etag", QString::fromLatin1(item->data(EtagRole).toByteArray()));
+        transfer.insert("lastModified", QString::fromLatin1(item->data(ModifiedRole).toByteArray()));
+        transfer.insert("error", item->data(ErrorRole).toString());
         transfer.insert("restartRequested", item->data(RestartRole).toBool());
         transfer.insert("bytesReceived", QString::number(received));
         transfer.insert("totalBytes",
@@ -1662,6 +1597,9 @@ void MainWindow::loadTransfers()
         auto *fileItem = new QStandardItem(icon, name);
         fileItem->setData(saved.value("id").toString(), IdRole);
         fileItem->setData(url, UrlRole);
+        fileItem->setData(saved.value("etag").toString().toLatin1(), EtagRole);
+        fileItem->setData(saved.value("lastModified").toString().toLatin1(), ModifiedRole);
+        fileItem->setData(saved.value("error").toString(), ErrorRole);
         fileItem->setData(path, PathRole);
         fileItem->setData(state, StateRole);
         fileItem->setData(saved.value("restartRequested").toBool(), RestartRole);
@@ -1703,8 +1641,8 @@ void MainWindow::loadTransfers()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (output_.isOpen())
-        output_.flush();
+    if (activeJob_)
+        activeJob_->flush();
     settings_.insert("windowGeometry", QString::fromLatin1(saveGeometry().toBase64()));
     saveSettings();
     saveTransfers();
