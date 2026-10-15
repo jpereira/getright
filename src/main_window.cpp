@@ -327,7 +327,11 @@ MainWindow::MainWindow(QWidget *parent)
         trayIcon_->setToolTip(tr("GetRight Port — Download: 0 bytes/s"));
         connect(trayIcon_, &QSystemTrayIcon::activated, this,
                 [this](QSystemTrayIcon::ActivationReason reason) {
-            if (reason != QSystemTrayIcon::Unknown)
+            if (reason == QSystemTrayIcon::Unknown || reason == QSystemTrayIcon::DoubleClick)
+                return;
+            if (isVisible() && !isMinimized())
+                close();
+            else
                 showMainWindow();
         });
         trayIcon_->show();

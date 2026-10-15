@@ -127,8 +127,8 @@ The `make screenshots` target generates a local screenshot when needed.
 
 Closing the main window hides it and keeps transfers running in the background.
 The original GetRight logo remains in the macOS menu bar. Click it with the left, right,
-or middle mouse button to reopen the window and bring it forward. Hover over the icon
-to see the combined download and upload speeds.
+or middle mouse button to hide a visible window or restore a hidden or minimized window
+and bring it forward. Hover over the icon to see the combined download and upload speeds.
 
 Use **File > Exit** or **Cmd+Q** to quit the application and save its state.
 On desktops without a system tray, closing the window exits the application.
