@@ -144,7 +144,8 @@ git push origin main v1.0.1
 ```
 
 The tag build publishes packages on GitHub Releases and refreshes the website download
-list. Releases are ad-hoc signed and are not Apple-notarized. GitHub Pages publishes the
+list. Rerunning a tag build replaces that release's package assets and notes; the notes identify
+the exact source commit and workflow run. Releases are ad-hoc signed and are not Apple-notarized. GitHub Pages publishes the
 static project site from `site/`; its package list contains assets from a published release.
 
 ## Interface and themes

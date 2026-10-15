@@ -27,6 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install build dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
         run: brew install qt cmake
       - name: Check version and architecture
         shell: bash
@@ -73,6 +75,8 @@ jobs:
 
           Website: https://jpereira.github.io/getright/
           Source and build instructions: https://github.com/jpereira/getright
+          Source commit: $GITHUB_SHA
+          Build: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           EOF
       - uses: actions/upload-artifact@v7
         with:
@@ -100,9 +104,16 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --verify-tag --title "GetRight Port $RELEASE_TAG" \
-            --notes-file packages/release-notes.md \
-            packages/*.dmg packages/*.zip packages/*.tar.gz packages/SHA256SUMS.txt
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "GetRight Port $RELEASE_TAG" \
+              --notes-file packages/release-notes.md
+            gh release upload "$RELEASE_TAG" --clobber \
+              packages/*.dmg packages/*.zip packages/*.tar.gz packages/SHA256SUMS.txt
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --title "GetRight Port $RELEASE_TAG" \
+              --notes-file packages/release-notes.md \
+              packages/*.dmg packages/*.zip packages/*.tar.gz packages/SHA256SUMS.txt
+          fi
       - name: Refresh website download list
         env:
           GH_TOKEN: ${{ github.token }}
