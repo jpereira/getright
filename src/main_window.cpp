@@ -36,6 +36,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QProgressBar>
+#include <QStyleOptionProgressBar>
 #include <QPushButton>
 #include <QSaveFile>
 #include <QStandardPaths>
@@ -70,34 +71,23 @@ public:
     void paint(QPainter *painter, const QStyleOptionViewItem &option,
                const QModelIndex &index) const override
     {
-        painter->save();
-        const bool selected = option.state & QStyle::State_Selected;
-        painter->fillRect(option.rect, selected ? option.palette.highlight()
-                                                : option.palette.base());
-
+        QStyleOptionProgressBar bar;
+        bar.rect = option.rect.adjusted(5, 5, -5, -5);
+        bar.palette = option.palette;
+        bar.state = option.state;
+        bar.minimum = 0;
         const QModelIndex name = index.sibling(index.row(), 0);
         const qint64 received = name.data(Qt::UserRole + 4).toLongLong();
         const qint64 total = name.data(Qt::UserRole + 5).toLongLong();
-        const int percent = total > 0
-                                ? qBound(0, int(received * 100 / total), 100)
-                                : 0;
-        QRect bar = option.rect.adjusted(5, 6, -5, -6);
-        painter->setPen(QColor("#a0a0a0"));
-        painter->setBrush(QColor("#f4f4f4"));
-        painter->drawRect(bar);
-        QRect fill = bar.adjusted(1, 1, -1, -1);
-        fill.setWidth(fill.width() * percent / 100);
-        if (fill.width() > 0) {
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(QColor("#55a85f"));
-            painter->drawRect(fill);
-        }
-        painter->setPen(selected ? option.palette.highlightedText().color()
-                                 : option.palette.text().color());
-        painter->drawText(bar, Qt::AlignCenter,
-                          total > 0 ? QStringLiteral("%1%").arg(percent)
-                                    : QStringLiteral("%1 bytes").arg(received));
-        painter->restore();
+        bar.maximum = total >= 0 ? 100 : 0;
+        bar.progress = total > 0
+            ? qBound(0, int(100.0 * received / total), 100) : 0;
+        bar.text = total > 0 ? QStringLiteral("%1%").arg(bar.progress)
+            : QLocale().formattedDataSize(received);
+        bar.textVisible = true;
+        bar.textAlignment = Qt::AlignCenter;
+        const QStyle *style = option.widget ? option.widget->style() : QApplication::style();
+        style->drawControl(QStyle::CE_ProgressBar, &bar, painter, option.widget);
     }
 };
 
