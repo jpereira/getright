@@ -78,6 +78,9 @@ private:
     void ensureFolderFilter(const QString &folder);
     void showHelp();
     void showDataFolder();
+    void openLocalFile(const QString &path);
+    void revealLocalFile(const QString &path);
+    void showCompletion(int row);
     void showStorageWarning(const QString &message);
     void showAbout();
 
@@ -102,6 +105,7 @@ private:
     QTimer *persistenceTimer_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;
     QPointer<QDialog> transferDialog_;
+    QPointer<QWidget> completionPopup_;
     QLabel *transferName_ = nullptr;
     QLineEdit *transferUrl_ = nullptr;
     QLineEdit *transferPath_ = nullptr;

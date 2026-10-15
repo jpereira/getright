@@ -6,6 +6,7 @@
 
 #include "main_window.h"
 #include "transfer_job.h"
+#include "completion_popup.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -84,6 +85,13 @@ private slots:
         QTRY_COMPARE(state(window, 1), QString("Complete"));
         QCOMPARE(state(window, 2), QString("Paused"));
         QCOMPARE(window.downloads_->selectionModel()->selectedRows().size(), 2);
+        QVERIFY(window.completionPopup_);
+        QVERIFY(window.completionPopup_->testAttribute(Qt::WA_ShowWithoutActivating));
+        QVERIFY(window.completionPopup_->windowFlags() & Qt::WindowDoesNotAcceptFocus);
+        auto *popup = qobject_cast<CompletionPopup *>(window.completionPopup_.data());
+        QVERIFY(popup);
+        QSignalSpy open(popup, &CompletionPopup::openRequested);
+        QVERIFY(open.isEmpty());
     }
 
     void pauseSelectedIncludesQueuedRows()

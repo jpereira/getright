@@ -36,6 +36,8 @@ qt_add_executable(getright-port
     src/main_window.h
     src/transfer_job.cpp
     src/transfer_job.h
+    src/completion_popup.cpp
+    src/completion_popup.h
     resources/getright.qrc
     "${APP_ICON}"
 )
@@ -70,7 +72,7 @@ if(BUILD_TESTING)
     target_link_libraries(transfer-tests PRIVATE Qt6::Network Qt6::Test)
     add_test(NAME transfers COMMAND transfer-tests)
     qt_add_executable(window-tests tests/window.cpp src/main_window.cpp src/main_window.h
-        src/transfer_job.cpp resources/getright.qrc)
+        src/transfer_job.cpp src/completion_popup.cpp resources/getright.qrc)
     target_include_directories(window-tests PRIVATE src)
     target_link_libraries(window-tests PRIVATE Qt6::Widgets Qt6::Network Qt6::Test)
     if(APPLE)

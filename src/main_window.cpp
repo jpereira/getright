@@ -6,6 +6,7 @@
 
 #include "main_window.h"
 #include "transfer_job.h"
+#include "completion_popup.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -1056,18 +1057,12 @@ void MainWindow::showTransferMenu(const QPoint &position)
     QAction *open = menu.addAction(tr("Open File"));
     open->setEnabled(completedFile);
     connect(open, &QAction::triggered, this, [this, path]() {
-        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
-            QMessageBox::warning(this, tr("Cannot open file"), tr("No application opened the file."));
+        openLocalFile(path);
     });
     QAction *reveal = menu.addAction(tr("Show in Finder"));
     reveal->setEnabled(!multiple && QFileInfo::exists(path));
     connect(reveal, &QAction::triggered, this, [this, path]() {
-#ifdef Q_OS_MACOS
-        if (!QProcess::startDetached("/usr/bin/open", {"-R", path}))
-            QMessageBox::warning(this, tr("Cannot reveal file"), tr("Finder could not be opened."));
-#else
-        QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
-#endif
+        revealLocalFile(path);
     });
     addAction(tr("Move To"), &MainWindow::moveSelected,
               !multiple && item->data(DirectionRole).toString() == "download" &&
@@ -1387,6 +1382,8 @@ void MainWindow::finishDownload(const QString &error)
         setRowState(row, tr("Stopped"));
     } else {
         setRowState(row, tr("Complete"));
+        if (transfer->data(DirectionRole).toString() == "download")
+            showCompletion(row);
         statusBar()->showMessage(transfer->data(DirectionRole).toString() == "upload"
             ? tr("Upload complete") : tr("Download complete"), 5000);
     }
@@ -1725,6 +1722,38 @@ void MainWindow::showMainWindow()
 #ifdef Q_OS_MACOS
     activateMacApplication();
 #endif
+}
+
+void MainWindow::openLocalFile(const QString &path)
+{
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+        QMessageBox::warning(this, tr("Cannot open file"), tr("No application opened the file."));
+}
+
+void MainWindow::revealLocalFile(const QString &path)
+{
+#ifdef Q_OS_MACOS
+    if (!QProcess::startDetached("/usr/bin/open", {"-R", path}))
+        QMessageBox::warning(this, tr("Cannot reveal file"), tr("Finder could not be opened."));
+#else
+    QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+#endif
+}
+
+void MainWindow::showCompletion(int row)
+{
+    const auto *item = model_->item(row, NameColumn);
+    const QString path = item->data(PathRole).toString();
+    if (completionPopup_)
+        completionPopup_->close();
+    auto *popup = new CompletionPopup(item->text(), item->data(ElapsedRole).toLongLong(),
+        QFileInfo(path).size(), windowIcon(), trayIcon_ ? trayIcon_->geometry() : QRect(), this);
+    completionPopup_ = popup;
+    connect(popup, &CompletionPopup::openRequested, this, [this, path]() { openLocalFile(path); });
+    connect(popup, &CompletionPopup::revealRequested, this,
+            [this, path]() { revealLocalFile(path); });
+    connect(popup, &CompletionPopup::showMainRequested, this, &MainWindow::showMainWindow);
+    popup->show();
 }
 
 void MainWindow::showStorageWarning(const QString &message)
