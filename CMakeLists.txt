@@ -34,6 +34,12 @@ set_source_files_properties("${APP_ICON}" PROPERTIES
 
 target_link_libraries(getright-port PRIVATE Qt6::Widgets Qt6::Network)
 
+if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(getright-port PRIVATE src/macos_application.mm)
+    target_link_libraries(getright-port PRIVATE "-framework AppKit")
+endif()
+
 set_target_properties(getright-port PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_GUI_IDENTIFIER org.personal.getright-port

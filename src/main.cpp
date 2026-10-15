@@ -6,6 +6,10 @@
 #include <QFileInfo>
 #include <QTimer>
 
+#ifdef Q_OS_MACOS
+void activateMacApplication();
+#endif
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
@@ -36,6 +40,27 @@ int main(int argc, char *argv[])
     if (parser.isSet(styleOption))
         window.applyLookAndFeel(parser.value(styleOption));
     window.show();
+    const auto bringForward = [&window]() {
+        if (window.isMinimized())
+            window.setWindowState(window.windowState() & ~Qt::WindowMinimized);
+        window.show();
+        window.raise();
+        window.activateWindow();
+#ifdef Q_OS_MACOS
+        activateMacApplication();
+#endif
+    };
+    QTimer::singleShot(0, &window, bringForward);
+    if (!parser.isSet(screenshotOption)) {
+        // Cocoa can finish launching after the first event loop turn.
+        QTimer::singleShot(200, &window, bringForward);
+        QObject::connect(&app, &QGuiApplication::applicationStateChanged, &window,
+                         [&window, bringForward](Qt::ApplicationState state) {
+            if (state == Qt::ApplicationActive &&
+                (!window.isVisible() || window.isMinimized()))
+                bringForward();
+        });
+    }
     if (parser.isSet(progressWindowOption))
         QTimer::singleShot(100, &window, [&window]() {
             window.showTransferDetails(0);
