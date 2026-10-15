@@ -11,6 +11,8 @@ filters on the left, a task list, a toolbar, detailed progress, and menus.
 [Project website](https://jpereira.github.io/getright/) ·
 [Download packages](https://github.com/jpereira/getright/releases)
 
+![GetRight Port running on macOS with the native light appearance](site/assets/port-light.png)
+
 ## Features
 
 - Download filters by status, folder, and common file types.
