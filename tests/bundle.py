@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE = Path(os.environ.get("GETRIGHT_APP_BUNDLE", ROOT / "build/getright-port.app"))
+BUNDLE = Path(os.environ.get("GETRIGHT_APP_BUNDLE", ROOT / "build/package/getright-port.app"))
 CONTENTS = BUNDLE / "Contents"
 EXECUTABLE = CONTENTS / "MacOS/getright-port"
 

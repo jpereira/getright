@@ -43,15 +43,16 @@ jobs:
       - name: Check persistence and bundled plugins
         run: |
           ctest --test-dir build --output-on-failure
-          python3 tests/persistence.py
+          GETRIGHT_APP_EXECUTABLE=build/package/getright-port.app/Contents/MacOS/getright-port \
+            python3 tests/persistence.py
           python3 tests/bundle.py
-          codesign --verify --deep --strict build/getright-port.app
+          codesign --verify --deep --strict build/package/getright-port.app
           hdiutil verify build/getright-port-macos-arm64.dmg
       - name: Create release packages
         run: |
           mkdir -p packages
           cp build/getright-port-macos-arm64.dmg "packages/getright-port-$VERSION-macos-arm64.dmg"
-          ditto -c -k --sequesterRsrc --keepParent build/getright-port.app \
+          ditto -c -k --sequesterRsrc --keepParent build/package/getright-port.app \
             "packages/getright-port-$VERSION-macos-arm64.zip"
           git archive --format=tar.gz --prefix="getright-port-$VERSION/" \
             -o "packages/getright-port-$VERSION-source.tar.gz" HEAD
